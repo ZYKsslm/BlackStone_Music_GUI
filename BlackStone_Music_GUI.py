@@ -15,13 +15,13 @@ sHeight = window.winfo_screenheight()
 wSize = f"800x500+{int((sWidth - 800) / 2)}+{int((sHeight - 500) / 2)}"
 window.geometry(wSize)
 window.resizable(False, False)
-window.iconbitmap(r".\Image\symbol.ico")
+window.iconbitmap(r".\Image\icon.ico")
 window.title("Music_Download_Tool_GUI")
-window.tk.call("source", r".\Azure-ttk-theme-main\azure.tcl")
+window.tk.call("source", r".\Azure-ttk-theme\azure.tcl")
 
 
 # 读取设置
-with open(r".\Setting\config.set", "r") as f:
+with open(r"Setting/config.ini", "r") as f:
     setting = f.readlines()
 
     wTheme = setting[0].rstrip()
@@ -57,7 +57,7 @@ if img_width != "none" and img_height != "none":
 
 
 def save_setting():
-    with open(r".\Setting\config.set", "w") as s:
+    with open(r"Setting/config.ini", "w") as s:
         s.write(f"{wTheme}\n")
         s.write(f"{v}\n")
         s.write(f"{path.get()}\n")
@@ -93,7 +93,7 @@ def vis():
     visT.geometry(rSize)
     visT.attributes("-alpha", v)
     visT.resizable(False, False)
-    visT.iconbitmap(r".\Image\symbol.ico")
+    visT.iconbitmap(r".\Image\icon.ico")
 
     visS = ttk.Scale(master=visT, from_=0.1, to=1, orient=tk.HORIZONTAL, length=200, command=change_vis)
     visS.place(x=30, y=80)
@@ -192,7 +192,7 @@ def get_path():
     wHeight = window.winfo_screenheight()
     rSize = f"300x160+{int((wWidth - 200) / 2)}+{int((wHeight - 100) / 2)}"
     pathT.geometry(rSize)
-    pathT.iconbitmap(r".\Image\symbol.ico")
+    pathT.iconbitmap(r".\Image\icon.ico")
 
     tk.Label(master=pathT, text="音乐路径：", font=("", 12)).place(x=0, y=0)
     tk.Label(master=pathT, text="歌词路径：", font=("", 12)).place(x=0, y=50)
