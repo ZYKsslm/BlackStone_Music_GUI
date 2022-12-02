@@ -1,6 +1,5 @@
 #!usr/bin/env python3
 # -*- coding: utf-8 -*-
-# 主题:github.com/rdbende/Azure-ttk-theme
 import tkinter as tk
 from tkinter import ttk
 from PIL import Image, ImageTk
