@@ -6,6 +6,9 @@
 > 
 > 所以不再打算进行改动了，如有issue，闲的话可能会再来修改
 
+![sample](sample.png)
+背景图片为**甘城なつき**老师的画作 *《oyasumi ?》*
+
 ### :label: 说明
 1. 本工具下载音乐使用的是[独角兽api](http://ovooa.com/)提供的音乐接口
 2. GUI使用Python自带的tkinter库进行制作，相对来说比较简陋
