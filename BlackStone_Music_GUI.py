@@ -15,7 +15,7 @@ wSize = f"800x500+{int((sWidth - 800) / 2)}+{int((sHeight - 500) / 2)}"
 window.geometry(wSize)
 window.resizable(False, False)
 window.iconbitmap(r".\Image\icon.ico")
-window.title("Music_Download_Tool_GUI")
+window.title("BlackStone_Music_GUI")
 window.tk.call("source", r".\Azure-ttk-theme\azure.tcl")
 
 
