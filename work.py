@@ -1,10 +1,9 @@
 # -*- coding: utf-8 -*-
 from requests import get
-from fake_useragent import UserAgent
 from re import sub
 
 headers = {
-        "User-Agent": UserAgent().random
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/108.0.0.0 Safari/537.36 Edg/108.0.1462.54"
 }
 
 kw_api = "http://ovooa.com/API/kwdg/api.php"
