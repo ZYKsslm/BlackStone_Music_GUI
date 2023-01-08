@@ -108,6 +108,7 @@ def wallpaper():
     global img_file, img
     img_file = tkFile.askopenfilename(title="选择图片", filetypes=[("PNG", "*png"), ("JPG", "*jpg"), ("GIF", "*gif")])
     if not img_file:
+        img_file = None
         msgbox.showwarning(title="提示", message="您没有选择任何文件")
         return
     img = Image.open(img_file)
@@ -148,6 +149,7 @@ def get_path():
     wHeight = window.winfo_screenheight()
     rSize = f"300x160+{int((wWidth - 200) / 2)}+{int((wHeight - 100) / 2)}"
     pathT.geometry(rSize)
+    pathT.attributes("-alpha", v)
     pathT.iconbitmap(r".\Image\icon.ico")
 
     def change_path():
@@ -157,7 +159,7 @@ def get_path():
             msgbox.showwarning(title="提示", message="您没有选择任何文件夹", parent=pathT)
         else:
             path.set(file)
-            msgbox.showinfo(title="提示", message="更改成功")
+            msgbox.showinfo(title="提示", message="更改成功", parent=pathT)
 
     def change_lyric_path():
         global lyric_path
@@ -166,7 +168,7 @@ def get_path():
             msgbox.showwarning(title="提示", message="您没有选择任何文件夹", parent=pathT)
         else:
             lyric_path.set(file)
-            msgbox.showinfo(title="提示", message="更改成功")
+            msgbox.showinfo(title="提示", message="更改成功", parent=pathT)
 
     tk.Label(master=pathT, text="音乐路径：", font=("", 12)).place(x=0, y=0)
     tk.Label(master=pathT, text="歌词路径：", font=("", 12)).place(x=0, y=50)
