@@ -13,13 +13,13 @@ window = tk.Tk()
 sWidth = window.winfo_screenwidth()
 sHeight = window.winfo_screenheight()
 # 让主窗口处于屏幕中间
-wSize = f"800x500+{int((sWidth - 800) / 2)}+{int((sHeight - 500) / 2)}"
+wSize = f"800x600+{int((sWidth - 800) / 2)}+{int((sHeight - 600) / 2)}"
 window.geometry(wSize)
 window.resizable(False, False)
-window.iconbitmap(r".\Image\icon.ico")
+window.iconbitmap(r"Image/icon.ico")
 window.title("BlackStone_Music_GUI")
 # 美化脚本
-window.tk.call("source", r".\Azure-ttk-theme\azure.tcl")
+window.tk.call("source", r"Azure-ttk-theme/azure.tcl")
 
 # 读取设置
 with open(r"config.json", "r") as f:
@@ -35,17 +35,15 @@ with open(r"config.json", "r") as f:
     lyric_path.set(setting["lyric_path"])
 
     img_file = setting["img_file"]
-    img_width = setting["img_width"]
-    img_height = setting["img_height"]
 
 # 设置主窗体样式
 window.tk.call("set_theme", wTheme)
 # 透明度
 window.attributes("-alpha", v)
 
+# 壁纸
 wallLb = ttk.Label(master=window)
 wallLb.pack()
-
 if img_file is not None:
     img = Image.open(img_file)
     img = ImageTk.PhotoImage(img)
@@ -61,8 +59,6 @@ def save_setting():
             "path": path.get(),
             "lyric_path": lyric_path.get(),
             "img_file": img_file,
-            "img_width": img_width,
-            "img_height": img_height
         }
 
         json.dump(config, s)
@@ -109,54 +105,30 @@ def vis():
 
 
 def wallpaper():
-    global img_file, img, img_width, img_height
+    global img_file, img
     img_file = tkFile.askopenfilename(title="选择图片", filetypes=[("PNG", "*png"), ("JPG", "*jpg"), ("GIF", "*gif")])
     if not img_file:
         msgbox.showwarning(title="提示", message="您没有选择任何文件")
         return
     img = Image.open(img_file)
+    suffix = img.format
+
+    if img.size[0]/img.size[1] == 4/3:
+        img = img.resize((800, 600))
+        img_file = f'Image/wallpaper.{suffix}'
+
+    img.save(f'Image/wallpaper.{suffix}')
     img = ImageTk.PhotoImage(img)
     wallLb.config(image=img)
-    img_width = None
-    img_height = None
-
-
-def wallAuto():
-    global img_file, img, img_width, img_height
-    img_file = tkFile.askopenfilename(title="选择图片", filetypes=[("PNG", "*png"), ("JPG", "*jpg"), ("GIF", "*gif")])
-    if not img_file:
-        msgbox.showwarning(title="提示", message="您没有选择任何文件")
-        return
-    img = Image.open(img_file)
-    w, h = img.size
-
-    f1 = 800.0 / w
-    f2 = 500.0 / h
-    factor = min(f1, f2)
-    img_width = int(w * factor)
-    img_height = int(h * factor)
-    img_size = (img_width, img_height)
-    wall_img = img.resize(img_size)
-
-    wall_img.save(fr".\Image\wallpaper.{img.format}")
-    img_file = fr".\Image\wallpaper.{img.format}"
-
-    window.geometry(f"{img_width}x{img_height}")
-
-    wall_img = ImageTk.PhotoImage(wall_img)
-    wallLb.config(image=wall_img)
 
 
 def default():
-    global img_file, wTheme, v, img_width, img_height
+    global img_file, wTheme, v
     v = 0.9
     wTheme = "dark"
     img_file = None
-    img_width = None
-    img_height = None
-
+    save_setting()
     # 重启程序
-    window.destroy()
     execl(executable, executable, *argv)
 
 
@@ -405,10 +377,8 @@ theme.add_command(label="dark(默认)", command=dark_theme)
 bgMenu = tk.Menu(master=optionMenu, tearoff=False)
 optionMenu.add_cascade(label="更换背景", menu=bgMenu)
 wallMenu = tk.Menu(master=bgMenu, tearoff=False)
-bgMenu.add_cascade(label="选择背景图片", menu=wallMenu)
+bgMenu.add_command(label="选择背景图片（建议尺寸4比3）", command=wallpaper)
 bgMenu.add_command(label="恢复默认", command=default)
-wallMenu.add_command(label="图片自适应", command=wallAuto)
-wallMenu.add_command(label="自动", command=wallpaper)
 
 # 调节透明度
 optionMenu.add_command(label="调节透明度", command=vis)
@@ -423,36 +393,36 @@ window.config(menu=menu)
 fileMenu.add_command(label="路径设置", command=get_path)
 
 tipLb = ttk.Label(master=window, text="请输入歌名:", font=("", 13))
-tipLb.place(x=50, y=25)
+tipLb.place(x=50, y=45)
 
 musicEn = ttk.Entry(master=window, font=("", 13))
-musicEn.place(x=170, y=20, width=450, height=33)
+musicEn.place(x=170, y=40, width=450, height=33)
 musicEn.bind("<Return>", en_search)
 
-tk.Button(master=window, text="搜索", font=("", 13), command=search).place(x=645, y=20, width=80, height=30)
+tk.Button(master=window, text="搜索", font=("", 13), command=search).place(x=645, y=40, width=80, height=30)
 
 origin = tk.StringVar()
 origin.set("音源:未选择")
 ttk.Radiobutton(master=window, text="酷狗音乐", variable=origin, value="酷狗音乐",
-                command=lambda: modeLb.configure(background="#1E90FF", foreground="white")).place(x=50, y=60)
+                command=lambda: modeLb.configure(background="#1E90FF", foreground="white")).place(x=50, y=88)
 ttk.Radiobutton(master=window, text="QQ音乐", variable=origin, value="QQ音乐",
-                command=lambda: modeLb.configure(background="gold", foreground="#3CB371")).place(x=150, y=60)
+                command=lambda: modeLb.configure(background="gold", foreground="#3CB371")).place(x=150, y=88)
 ttk.Radiobutton(master=window, text="酷我音乐", variable=origin, value="酷我音乐",
-                command=lambda: modeLb.configure(background="gold", foreground="#FF4500")).place(x=250, y=60)
+                command=lambda: modeLb.configure(background="gold", foreground="#FF4500")).place(x=250, y=88)
 ttk.Radiobutton(master=window, text="网易云音乐", variable=origin, value="网易云音乐",
-                command=lambda: modeLb.configure(background="red", foreground="white")).place(x=450, y=60)
+                command=lambda: modeLb.configure(background="red", foreground="white")).place(x=450, y=88)
 ttk.Radiobutton(master=window, text="咪咕音乐", variable=origin, value="咪咕音乐",
-                command=lambda: modeLb.configure(background="#FF1493", foreground="white")).place(x=350, y=60)
+                command=lambda: modeLb.configure(background="#FF1493", foreground="white")).place(x=350, y=88)
 
-ttk.Label(master=window, text="信息:", font=("", 13)).place(x=510, y=100)
-ttk.Label(master=window, relief="sunken").place(x=510, y=135, width=250, height=320)
+ttk.Label(master=window, text="信息:", font=("", 13)).place(x=510, y=135)
+ttk.Label(master=window, relief="sunken").place(x=510, y=177, width=250, height=320)
 modeLb = ttk.Label(master=window, textvariable=origin, font=("", 13))
-modeLb.place(x=520, y=145)
+modeLb.place(x=520, y=190)
 
-ttk.Label(master=window, text="搜索结果:", font=("", 13)).place(x=50, y=100)
+ttk.Label(master=window, text="搜索结果:", font=("", 13)).place(x=50, y=135)
 info = tk.StringVar()
 infoListB = tk.Listbox(master=window, relief="groove", listvariable=info, font=("", 13))
-infoListB.place(x=50, y=135, width=380, height=320)
+infoListB.place(x=50, y=177, width=380, height=320)
 
 yScroll = ttk.Scrollbar(master=infoListB, command=infoListB.yview)
 yScroll.pack(side="right", fill=tk.Y)
@@ -463,28 +433,28 @@ infoListB.config(xscrollcommand=xScroll.set, yscrollcommand=yScroll.set)
 song = tk.StringVar()
 song.set("无歌名")
 songT = tk.Text(master=window, font=("", 13))
-songT.place(x=520, y=180, width=230, height=50)
+songT.place(x=520, y=230, width=230, height=50)
 songT.insert(tk.INSERT, song.get())
 
 singer = tk.StringVar()
 singer.set("无歌手")
 singerT = tk.Text(master=window, font=("", 13))
-singerT.place(x=520, y=250, width=230, height=60)
+singerT.place(x=520, y=315, width=230, height=60)
 singerT.insert(tk.INSERT, singer.get())
 
 url = tk.StringVar()
 url.set("无链接")
 urlT = tk.Text(master=window, font=("", 13))
-urlT.place(x=520, y=330, width=230, height=65)
+urlT.place(x=520, y=410, width=230, height=65)
 urlT.insert(tk.INSERT, url.get())
 
 downloadBtn = tk.Button(master=window, state=tk.DISABLED, text="下\n载\n音\n乐", relief="groove", font=("", 13),
                         command=download)
-downloadBtn.place(x=450, y=135, width=40, height=100)
+downloadBtn.place(x=450, y=177, width=40, height=100)
 
 dlLyricBtn = tk.Button(master=window, state=tk.DISABLED, text="下\n载\n歌\n词", relief="groove", font=("", 13),
                        command=download_lyric)
-dlLyricBtn.place(x=450, y=255, width=40, height=100)
+dlLyricBtn.place(x=450, y=310, width=40, height=100)
 
 window.protocol("WM_DELETE_WINDOW", bye)
 window.mainloop()
