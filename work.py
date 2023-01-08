@@ -158,6 +158,7 @@ def mg_download_lyric(song, singer, lyric, lyric_path):
 def qq_get_music(name):
     data = {
         "msg": name,
+        "limit": 50
     }
     resp = get(url=qq_api, headers=headers, params=data)
     music_info = resp.json()["data"]
@@ -166,7 +167,18 @@ def qq_get_music(name):
     choice_list = []
     for i in music_info:
         music_name = i["song"]
-        singers = i["singers"][0]
+        singer_list = i["singers"]
+        singer_num = len(singer_list)
+        singers = ""
+        if singer_num > 1:
+            for s in range(singer_num):
+                s += 1
+                if s == singer_num:
+                    singers += f"{singer_list[s-1]}"
+                else:
+                    singers += f"{singer_list[s-1]}、"
+        else:
+            singers = singer_list[0]
         choice = f"{music_name}-{singers}"
         choice_list.append(choice)
 
@@ -211,8 +223,18 @@ def wy_get_music(name):
     choice_list = []
     for i in music_info:
         music_name = i["song"]
-        singers = i["singers"]
-
+        singer_list = i["singers"]
+        singer_num = len(singer_list)
+        singers = ""
+        if singer_num > 1:
+            for s in range(singer_num):
+                s += 1
+                if s == singer_num:
+                    singers += f"{singer_list[s - 1]}"
+                else:
+                    singers += f"{singer_list[s - 1]}、"
+        else:
+            singers = singer_list[0]
         choice = f"{music_name}-{singers}"
         choice_list.append(choice)
 
