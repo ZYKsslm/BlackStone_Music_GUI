@@ -4,9 +4,14 @@ from tkinter import ttk
 from PIL import Image, ImageTk
 import tkinter.messagebox as msgbox
 import tkinter.filedialog as tkFile
-import json
-from os import execl
+try:
+    from ujson import load, dump
+except ModuleNotFoundError:
+    from json import load, dump
+from os import execl, startfile, getcwd
+from os.path import join
 from sys import executable, argv
+from threading import Thread
 import work
 
 window = tk.Tk()
@@ -23,7 +28,7 @@ window.tk.call("source", r"Azure-ttk-theme/azure.tcl")
 
 # 读取设置
 with open(r"config.json", "r") as f:
-    setting = json.load(f)
+    setting = load(f)
 
     wTheme = setting["wTheme"]
     v = setting["v"]
@@ -61,7 +66,7 @@ def save_setting():
             "img_file": img_file,
         }
 
-        json.dump(config, s)
+        dump(config, s)
 
 
 def light_theme():
@@ -92,7 +97,7 @@ def vis():
     visT.geometry(vSize)
     visT.attributes("-alpha", v)
     visT.resizable(False, False)
-    visT.iconbitmap(r".\Image\icon.ico")
+    visT.iconbitmap(r"./Image/icon.ico")
 
     def change_vis(vf):
         global v
@@ -106,21 +111,49 @@ def vis():
 
 def wallpaper():
     global img_file, img
-    img_file = tkFile.askopenfilename(title="选择图片", filetypes=[("PNG", "*png"), ("JPG", "*jpg"), ("GIF", "*gif")])
-    if not img_file:
-        img_file = None
+    file = tkFile.askopenfilename(title="选择图片", filetypes=[("PNG", "*png"), ("JPG", "*jpg"), ("GIF", "*gif")])
+    if not file:
         msgbox.showwarning(title="提示", message="您没有选择任何文件")
         return
-    img = Image.open(img_file)
-    suffix = img.format
+    image = Image.open(file)
+    suffix = image.format
 
-    if img.size[0]/img.size[1] == 4/3:
-        img = img.resize((800, 600))
+    if image.size[0] / image.size[1] == 4 / 3:
+        image = image.resize((800, 600))
+        image.save(f'Image/wallpaper.{suffix}')
         img_file = f'Image/wallpaper.{suffix}'
+        image = ImageTk.PhotoImage(image)
+        img = image
+        wallLb.config(image=img)
+    else:
+        img_file = None
 
-    img.save(f'Image/wallpaper.{suffix}')
-    img = ImageTk.PhotoImage(img)
-    wallLb.config(image=img)
+        def wall_auto(im, color):
+            global img_file, img
+            coefficient = min(800 / im.size[0], 600 / im.size[1])
+            im = im.resize((int(im.size[0] * coefficient), int(im.size[1] * coefficient)))
+            bg = Image.new(mode="RGBA", size=(800, 600), color=f"{color}c0")
+            position = (int((800 - im.size[0]) / 2), int((600 - im.size[1]) / 2))
+            bg.paste(im=im, box=position)
+            bg.save(f'Image/wallpaper.{suffix}')
+            img_file = f'Image/wallpaper.{suffix}'
+            bg = ImageTk.PhotoImage(bg)
+            img = bg
+            wallLb.config(image=img)
+
+        wallT = tk.Toplevel(master=window)
+        wallT.title("设置背景底色")
+        wWidth = window.winfo_screenwidth()
+        wHeight = window.winfo_screenheight()
+        rSize = f"300x160+{int((wWidth - 200) / 2)}+{int((wHeight - 100) / 2)}"
+        wallT.geometry(rSize)
+        wallT.attributes("-alpha", v)
+        wallT.iconbitmap(r"./Image/icon.ico")
+        tk.Label(master=wallT, text="请输入一个十六进制的背景底色", font=("", 12)).place(x=40, y=10)
+        wallEn = ttk.Entry(master=wallT, font=("", 13))
+        wallEn.insert(0, "#FFFFFF")
+        wallEn.place(x=50, y=40, width=200, height=33)
+        tk.Button(master=wallT, text="完成", font=("", 13), command=lambda: wall_auto(image, wallEn.get())).place(x=130, y=100)
 
 
 def default():
@@ -150,7 +183,7 @@ def get_path():
     rSize = f"300x160+{int((wWidth - 200) / 2)}+{int((wHeight - 100) / 2)}"
     pathT.geometry(rSize)
     pathT.attributes("-alpha", v)
-    pathT.iconbitmap(r".\Image\icon.ico")
+    pathT.iconbitmap(r"./Image/icon.ico")
 
     def change_path():
         global path
@@ -178,6 +211,13 @@ def get_path():
     tk.Button(master=pathT, text="更改歌词保存路径", font=("", 13), command=change_lyric_path).place(x=150, y=100)
 
 
+def music_file():
+    music_path = path.get()
+    if music_path == "./Download":
+        music_path = join(getcwd(), "Download")
+    startfile(music_path)
+
+
 # 回车以搜索
 def en_search(self):
     search()
@@ -200,9 +240,16 @@ def search():
         music_list = work.kg_get_music(music_name)
         info.set(music_list)
 
-    elif origin.get() == "QQ音乐":
+    elif origin.get() == "QQ音乐VIP":
         downloadBtn.config(state=tk.NORMAL)
         dlLyricBtn.config(state=tk.DISABLED)
+        music_name = musicEn.get()
+        music_list = work.vip_qq_get_music(music_name)
+        info.set(music_list)
+
+    elif origin.get() == "QQ音乐":
+        downloadBtn.config(state=tk.NORMAL)
+        dlLyricBtn.config(state=tk.NORMAL)
         music_name = musicEn.get()
         music_list = work.qq_get_music(music_name)
         info.set(music_list)
@@ -233,19 +280,23 @@ def search():
         return
 
 
-lyric = None
+mg_lyric = None
+qq_lyric = None
 
 
 def download():
-    global lyric
+    global mg_lyric, qq_lyric
     try:
         n = infoListB.curselection()
     except tk._tkinter.TclError:
         msgbox.showwarning(title="提示", message="您还未选择任何音乐")
         return
 
-    if origin.get() == "酷狗音乐":
-        info_list = work.kg_download(music_name, n[0] + 1, path.get())
+    def kg():
+        info_list = work.kw_download(music_name, n[0] + 1, path.get())
+        if info_list is False:
+            msgbox.showwarning(title="下载", message="下载失败！")
+            return
         song.set(info_list[0])
         singer.set(info_list[1])
         url.set(info_list[2])
@@ -260,8 +311,11 @@ def download():
 
         msgbox.showinfo(title="酷狗音乐", message=f"下载完成\n{song.get()}")
 
-    elif origin.get() == "QQ音乐":
-        info_list = work.qq_download(music_name, n[0] + 1, path.get())
+    def qq_vip():
+        info_list = work.vip_qq_download(music_name, n[0] + 1, path.get())
+        if info_list is False:
+            msgbox.showwarning(title="下载", message="下载失败！")
+            return
         song.set(info_list[0])
         singer.set(info_list[1])
         url.set(info_list[2])
@@ -276,11 +330,36 @@ def download():
 
         msgbox.showinfo(title="QQ音乐", message=f"音乐下载完成\n{song.get()}")
 
-    elif origin.get() == "咪咕音乐":
-        info_list = work.mg_download(music_name, n[0] + 1, path.get())
+    def qq():
+        global qq_lyric
+        info_list = work.qq_download(music_name, n[0] + 1, path.get())
+        if info_list is False:
+            msgbox.showwarning(title="下载", message="下载失败！")
+            return
         song.set(info_list[0])
         singer.set(info_list[1])
-        lyric = info_list[2]
+        url.set(info_list[2])
+        qq_lyric = info_list[3]
+
+        songT.delete("1.0", tk.END)
+        singerT.delete("1.0", tk.END)
+        urlT.delete("1.0", tk.END)
+
+        songT.insert(tk.INSERT, song.get())
+        singerT.insert(tk.INSERT, singer.get())
+        urlT.insert(tk.INSERT, url.get())
+
+        msgbox.showinfo(title="QQ音乐", message=f"音乐下载完成\n{song.get()}")
+
+    def mg():
+        global mg_lyric
+        info_list = work.mg_download(music_name, n[0] + 1, path.get())
+        if info_list is False:
+            msgbox.showwarning(title="下载", message="下载失败！")
+            return
+        song.set(info_list[0])
+        singer.set(info_list[1])
+        mg_lyric = info_list[2]
 
         songT.delete("1.0", tk.END)
         singerT.delete("1.0", tk.END)
@@ -291,8 +370,11 @@ def download():
 
         msgbox.showinfo(title="咪咕音乐", message=f"音乐下载完成\n{song.get()}")
 
-    elif origin.get() == "网易云音乐":
+    def wy():
         info_list = work.wy_download(music_name, n[0] + 1, path.get())
+        if info_list is False:
+            msgbox.showwarning(title="下载", message="下载失败！")
+            return
         song.set(info_list[0])
         singer.set(info_list[1])
         url.set(info_list[2])
@@ -307,8 +389,11 @@ def download():
 
         msgbox.showinfo(title="网易云音乐", message=f"音乐下载完成\n{song.get()}")
 
-    else:
+    def kw():
         info_list = work.kw_download(music_name, n[0] + 1, path.get())
+        if info_list is False:
+            msgbox.showwarning(title="下载", message="下载失败！")
+            return
         song.set(info_list[0])
         singer.set(info_list[1])
 
@@ -321,9 +406,33 @@ def download():
 
         msgbox.showinfo(title="酷我音乐", message=f"下载完成\n{song.get()}")
 
+    if origin.get() == "酷狗音乐":
+        thread = Thread(target=kg)
+        thread.start()
+
+    elif origin.get() == "QQ音乐VIP":
+        thread = Thread(target=qq_vip)
+        thread.start()
+
+    elif origin.get() == "QQ音乐":
+        thread = Thread(target=qq)
+        thread.start()
+
+    elif origin.get() == "咪咕音乐":
+        thread = Thread(target=mg)
+        thread.start()
+
+    elif origin.get() == "网易云音乐":
+        thread = Thread(target=wy)
+        thread.start()
+
+    else:
+        thread = Thread(target=kw)
+        thread.start()
+
 
 def download_lyric():
-    global lyric
+    global qq_lyric, mg_lyric
     try:
         infoListB.get(infoListB.curselection())
     except tk._tkinter.TclError:
@@ -331,15 +440,18 @@ def download_lyric():
         return
 
     if origin.get() == "咪咕音乐":
-        if lyric != "":
-            work.mg_download_lyric(song.get(), singer.get(), lyric, lyric_path.get())
+        if mg_lyric is not None:
+            work.mg_download_lyric(song.get(), singer.get(), mg_lyric, lyric_path.get())
             msgbox.showinfo(title="咪咕音乐", message=f"歌词下载完成\n{song.get()}")
         else:
             n = infoListB.curselection()
-            info_list = work.mg_download(music_name, n[0] + 1, path.get())
+            info_list = work.mg_download(music_name, n[0] + 1, path.get(), True)
+            if info_list is False:
+                msgbox.showwarning(title="下载", message="下载失败！")
+                return
             song.set(info_list[0])
             singer.set(info_list[1])
-            lyric = info_list[2]
+            mg_lyric = info_list[2]
 
             songT.delete("1.0", tk.END)
             singerT.delete("1.0", tk.END)
@@ -348,7 +460,31 @@ def download_lyric():
             songT.insert(tk.INSERT, song.get())
             singerT.insert(tk.INSERT, singer.get())
 
-            work.mg_download_lyric(music_name, singer.get(), lyric, lyric_path.get())
+            work.mg_download_lyric(music_name, singer.get(), mg_lyric, lyric_path.get())
+            msgbox.showinfo(title="咪咕音乐", message=f"歌词下载完成\n{song.get()}")
+
+    elif origin.get() == "QQ音乐":
+        if qq_lyric is not None:
+            work.qq_download_lyric(song.get(), singer.get(), qq_lyric, lyric_path.get())
+            msgbox.showinfo(title="咪咕音乐", message=f"歌词下载完成\n{song.get()}")
+        else:
+            n = infoListB.curselection()
+            info_list = work.qq_download(music_name, n[0] + 1, path.get(), True)
+            if info_list is False:
+                msgbox.showwarning(title="下载", message="下载失败！")
+                return
+            song.set(info_list[0])
+            singer.set(info_list[1])
+            qq_lyric = info_list[2]
+
+            songT.delete("1.0", tk.END)
+            singerT.delete("1.0", tk.END)
+            urlT.delete("1.0", tk.END)
+
+            songT.insert(tk.INSERT, song.get())
+            singerT.insert(tk.INSERT, singer.get())
+
+            work.mg_download_lyric(music_name, singer.get(), qq_lyric, lyric_path.get())
             msgbox.showinfo(title="咪咕音乐", message=f"歌词下载完成\n{song.get()}")
 
 
@@ -365,7 +501,7 @@ menu.add_cascade(label="关于", menu=aboutMenu)
 aboutMenu.add_command(
     label="说明", command=lambda: msgbox.showinfo(title="说明", message="作者:ZYKsslm\nQQ:3119964735\n该软件仅供学习交流使用!"))
 aboutMenu.add_command(label="版本", command=lambda: msgbox.showinfo(
-    title="版本", message="ver 0.1.3-GUI\n需要兼容python>=3.10"))
+    title="版本", message="ver 0.1.4-GUI\n需要兼容python>=3.10"))
 
 # 设置:更换主题
 themeMenu = tk.Menu(master=optionMenu, tearoff=False)
@@ -393,6 +529,7 @@ window.config(menu=menu)
 
 # 文件
 fileMenu.add_command(label="路径设置", command=get_path)
+fileMenu.add_command(label="打开音乐文件夹", command=music_file)
 
 tipLb = ttk.Label(master=window, text="请输入歌名:", font=("", 13))
 tipLb.place(x=50, y=45)
@@ -407,14 +544,16 @@ origin = tk.StringVar()
 origin.set("音源:未选择")
 ttk.Radiobutton(master=window, text="酷狗音乐", variable=origin, value="酷狗音乐",
                 command=lambda: modeLb.configure(background="#1E90FF", foreground="white")).place(x=50, y=88)
-ttk.Radiobutton(master=window, text="QQ音乐", variable=origin, value="QQ音乐",
+ttk.Radiobutton(master=window, text="QQ音乐VIP", variable=origin, value="QQ音乐VIP",
                 command=lambda: modeLb.configure(background="gold", foreground="#3CB371")).place(x=150, y=88)
+ttk.Radiobutton(master=window, text="QQ音乐", variable=origin, value="QQ音乐",
+                command=lambda: modeLb.configure(background="gold", foreground="#3CB371")).place(x=260, y=88)
 ttk.Radiobutton(master=window, text="酷我音乐", variable=origin, value="酷我音乐",
-                command=lambda: modeLb.configure(background="gold", foreground="#FF4500")).place(x=250, y=88)
+                command=lambda: modeLb.configure(background="gold", foreground="#FF4500")).place(x=350, y=88)
 ttk.Radiobutton(master=window, text="网易云音乐", variable=origin, value="网易云音乐",
                 command=lambda: modeLb.configure(background="red", foreground="white")).place(x=450, y=88)
 ttk.Radiobutton(master=window, text="咪咕音乐", variable=origin, value="咪咕音乐",
-                command=lambda: modeLb.configure(background="#FF1493", foreground="white")).place(x=350, y=88)
+                command=lambda: modeLb.configure(background="#FF1493", foreground="white")).place(x=550, y=88)
 
 ttk.Label(master=window, text="信息:", font=("", 13)).place(x=510, y=135)
 ttk.Label(master=window, relief="sunken").place(x=510, y=177, width=250, height=320)
