@@ -2,9 +2,7 @@
 
 >:page_facing_up: 正如简介所述，这是一个简约的音乐下载工具
 
-![sample](sample.png)
-
-背景图片为**甘城なつき**的 *《oyasumi ?》*
+![sample](sample.jpg)
 
 ### :label: 说明
 1. 本工具下载音乐使用的是[独角兽api](http://ovooa.com/)提供的音乐接口
