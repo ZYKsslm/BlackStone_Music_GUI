@@ -1,11 +1,16 @@
 # -*- coding: utf-8 -*-
 from requests import get
+from random import choice
 from re import sub
 from filetype import guess
+try:
+    from ujson import load, dump
+except ModuleNotFoundError:
+    from json import load, dump
 
-headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/108.0.0.0 Safari/537.36 Edg/108.0.1462.54"
-}
+
+with open("User-Agent.json") as u:
+    user_agent_json = load(u)
 
 kw_api = "http://ovooa.com/API/kwdg/api.php"
 kg_api = "http://ovooa.com/API/kgdg/api.php"
@@ -15,8 +20,17 @@ qq_api = "http://ovooa.com/API/qqdg/api.php"
 wy_api = "http://ovooa.com/API/wydg/api.php"
 
 
+def get_user_agent():
+    user_agent = choice(choice(list(choice(user_agent_json).values())))
+    return user_agent
+
+
 # 酷我音乐
 def kw_get_music(name):
+
+    headers = {
+        "User-Agent": get_user_agent()
+    }
 
     data = {
         "msg": name,
@@ -30,13 +44,17 @@ def kw_get_music(name):
         music_name = i["song"]
         singers = i["singer"]
 
-        choice = f"{music_name}-{singers}"
-        choice_list.append(choice)
+        choose = f"{music_name}-{singers}"
+        choice_list.append(choose)
 
     return choice_list
 
 
 def kw_download(name, n, path):
+
+    headers = {
+        "User-Agent": get_user_agent()
+    }
 
     data = {
         "msg": name,
@@ -70,6 +88,10 @@ def kw_download(name, n, path):
 # 酷狗音乐
 def kg_get_music(name):
 
+    headers = {
+        "User-Agent": get_user_agent()
+    }
+
     data = {
         "msg": name,
     }
@@ -82,13 +104,17 @@ def kg_get_music(name):
         music_name = i["name"]
         singers = i["singer"]
 
-        choice = f"{music_name}-{singers}"
-        choice_list.append(choice)
+        choose = f"{music_name}-{singers}"
+        choice_list.append(choose)
 
     return choice_list
 
 
 def kg_download(name, n, path):
+
+    headers = {
+        "User-Agent": get_user_agent()
+    }
 
     data = {
         "msg": name,
@@ -123,6 +149,10 @@ def kg_download(name, n, path):
 # 咪咕音乐
 def mg_get_music(name):
 
+    headers = {
+        "User-Agent": get_user_agent()
+    }
+
     data = {
         "msg": name,
     }
@@ -134,13 +164,17 @@ def mg_get_music(name):
         music_name = i["song"]
         singers = i["singer"]
 
-        choice = f"{music_name}-{singers}"
-        choice_list.append(choice)
+        choose = f"{music_name}-{singers}"
+        choice_list.append(choose)
 
     return choice_list
 
 
-def mg_download(name, n, path, get_lyric=False):
+def mg_download(name, n, path, get_lyric=False, lyric_path=None):
+
+    headers = {
+        "User-Agent": get_user_agent()
+    }
 
     data = {
         "msg": name,
@@ -162,26 +196,27 @@ def mg_download(name, n, path, get_lyric=False):
     content = resp.content
     resp.close()
 
-    if get_lyric is False:
-        kind = guess(content)
-        if kind is None:
-            return False
+    kind = guess(content)
+    if kind is None:
+        return False
 
-        with open(fr"{path}/{song}-{singer}.{kind.extension}", "wb+") as f:
-            f.write(content)
+    with open(fr"{path}/{song}-{singer}.{kind.extension}", "wb+") as f:
+        f.write(content)
 
-        return [song, singer, lyric]
-    else:
-        return
+    if get_lyric is True:
+        with open(fr"{lyric_path}/{song}-{singer}.txt", "w+", encoding="utf-8") as f:
+            f.write(lyric)
 
-
-def mg_download_lyric(song, singer, lyric, lyric_path):
-    with open(fr"{lyric_path}/{song}-{singer}.txt", "w+", encoding="utf-8") as f:
-        f.write(lyric)
+    return [song, singer]
 
 
 # QQ音乐VIP
 def vip_qq_get_music(name):
+
+    headers = {
+        "User-Agent": get_user_agent()
+    }
+
     data = {
         "msg": name,
         "limit": 50
@@ -205,13 +240,18 @@ def vip_qq_get_music(name):
                     singers += f"{singer_list[s-1]}、"
         else:
             singers = singer_list[0]
-        choice = f"{music_name}-{singers}"
-        choice_list.append(choice)
+        choose = f"{music_name}-{singers}"
+        choice_list.append(choose)
 
     return choice_list
 
 
 def vip_qq_download(name, n, path):
+
+    headers = {
+        "User-Agent": get_user_agent()
+    }
+
     data = {
         "msg": name,
         "n": n
@@ -245,6 +285,11 @@ def vip_qq_download(name, n, path):
 
 # QQ音乐
 def qq_get_music(name):
+
+    headers = {
+        "User-Agent": get_user_agent()
+    }
+
     data = {
         "msg": name,
         "sc": 50
@@ -257,13 +302,18 @@ def qq_get_music(name):
     for i in music_info:
         music_name = i["song"]
         singers = i["singers"]
-        choice = f"{music_name}-{singers}"
-        choice_list.append(choice)
+        choose = f"{music_name}-{singers}"
+        choice_list.append(choose)
 
     return choice_list
 
 
-def qq_download(name, n, path, get_lyric=False):
+def qq_download(name, n, path, get_lyric=False, lyric_path=None):
+
+    headers = {
+        "User-Agent": get_user_agent()
+    }
+
     data = {
         "msg": name,
         "n": n
@@ -286,26 +336,26 @@ def qq_download(name, n, path, get_lyric=False):
     content = resp.content
     resp.close()
 
-    if get_lyric is False:
-        kind = guess(content)
-        if kind is None:
-            return False
+    kind = guess(content)
+    if kind is None:
+        return False
 
-        with open(fr"{path}/{song}-{singer}.{kind.extension}", "wb+") as f:
-            f.write(content)
+    with open(fr"{path}/{song}-{singer}.{kind.extension}", "wb+") as f:
+        f.write(content)
 
-        return [song, singer, music_url, lyric]
-    else:
-        return
+    if get_lyric is True:
+        with open(fr"{lyric_path}/{song}-{singer}.txt", "w+", encoding="utf-8") as f:
+            f.write(lyric)
 
-
-def qq_download_lyric(song, singer, lyric, lyric_path):
-    with open(fr"{lyric_path}/{song}-{singer}.txt", "w+", encoding="utf-8") as f:
-        f.write(lyric)
+    return [song, singer, music_url]
 
 
 # 网易云音乐
 def wy_get_music(name):
+
+    headers = {
+        "User-Agent": get_user_agent()
+    }
 
     data = {
         "msg": name,
@@ -329,13 +379,17 @@ def wy_get_music(name):
                     singers += f"{singer_list[s - 1]}、"
         else:
             singers = singer_list[0]
-        choice = f"{music_name}-{singers}"
-        choice_list.append(choice)
+        choose = f"{music_name}-{singers}"
+        choice_list.append(choose)
 
     return choice_list
 
 
 def wy_download(name, n, path):
+
+    headers = {
+        "User-Agent": get_user_agent()
+    }
 
     data = {
         "msg": name,
