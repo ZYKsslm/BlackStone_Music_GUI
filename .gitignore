@@ -3,3 +3,4 @@
 *.xml
 
 __pycache__/work.cpython-310.pyc
+package.bat
