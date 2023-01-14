@@ -10,7 +10,6 @@ from sys import executable, argv
 from threading import Thread
 from work import *
 
-
 # 主窗口
 window = tk.Tk()
 sWidth = window.winfo_screenwidth()
@@ -92,13 +91,11 @@ def vis():
     # 窗口设置
     visT = tk.Toplevel(master=window)
     visT.title("透明度设置")
-    vWidth = window.winfo_screenwidth()
-    vHeight = window.winfo_screenheight()
-    vSize = f"250x200+{int((vWidth - 250) / 2)}+{int((vHeight - 200) / 2)}"
+    vSize = f"250x200+{int((sWidth - 250) / 2)}+{int((sHeight - 200) / 2)}"
     visT.geometry(vSize)
     visT.attributes("-alpha", v)
     visT.resizable(False, False)
-    visT.iconbitmap(r"./Image/icon.ico")
+    visT.iconbitmap(r"Image/icon.ico")
 
     def change_vis(vf):
         global v
@@ -143,17 +140,17 @@ def wallpaper():
 
         wallT = tk.Toplevel(master=window)
         wallT.title("设置背景底色")
-        wWidth = window.winfo_screenwidth()
-        wHeight = window.winfo_screenheight()
-        rSize = f"300x160+{int((wWidth - 200) / 2)}+{int((wHeight - 100) / 2)}"
+        rSize = f"300x160+{int((sWidth - 200) / 2)}+{int((sHeight - 100) / 2)}"
         wallT.geometry(rSize)
         wallT.attributes("-alpha", v)
-        wallT.iconbitmap(r"./Image/icon.ico")
+        wallT.iconbitmap(r"Image/icon.ico")
+        wallT.resizable(False, False)
         tk.Label(master=wallT, text="请输入一个十六进制的背景底色", font=("", 12)).place(x=40, y=10)
         wallEn = ttk.Entry(master=wallT, font=("", 13))
         wallEn.insert(0, "#FFFFFF")
         wallEn.place(x=50, y=40, width=200, height=33)
-        tk.Button(master=wallT, text="完成", font=("", 13), command=lambda: wall_auto(image, wallEn.get())).place(x=130, y=100)
+        tk.Button(master=wallT, text="完成", font=("", 13), command=lambda: wall_auto(image, wallEn.get())).place(x=130,
+                                                                                                                y=100)
 
 
 # 恢复默认界面
@@ -181,12 +178,31 @@ def bye():
 def get_path():
     pathT = tk.Toplevel(master=window)
     pathT.title("路径设置")
-    wWidth = window.winfo_screenwidth()
-    wHeight = window.winfo_screenheight()
-    rSize = f"300x160+{int((wWidth - 200) / 2)}+{int((wHeight - 100) / 2)}"
+    rSize = f"400x300+{int((sWidth - 400) / 2)}+{int((sHeight - 300) / 2)}"
     pathT.geometry(rSize)
     pathT.attributes("-alpha", v)
-    pathT.iconbitmap(r"./Image/icon.ico")
+    pathT.iconbitmap(r"Image/icon.ico")
+    pathT.resizable(False, False)
+
+    tk.Label(master=pathT, text="音乐路径：", font=("", 12)).place(x=0, y=55)
+    tk.Label(master=pathT, text="歌词路径：", font=("", 12)).place(x=0, y=155)
+
+    pathTe = ttk.Entry(master=pathT, font=("", 12))
+    pathTe.insert(tk.INSERT, path.get())
+    pathTe.config(state=tk.DISABLED)
+    pathTe.place(x=80, y=50, width=300, height=40)
+
+    lyricT = ttk.Entry(master=pathT, font=("", 12))
+    lyricT.insert(tk.INSERT, lyric_path.get())
+    lyricT.config(state=tk.DISABLED)
+    lyricT.place(x=80, y=150, width=300, height=40)
+
+    pathS = ttk.Scrollbar(master=pathTe, command=pathTe.xview, orient=tk.HORIZONTAL)
+    lyricS = ttk.Scrollbar(master=lyricT, command=lyricT.xview, orient=tk.HORIZONTAL)
+    pathS.pack(side=tk.BOTTOM, fill=tk.X)
+    lyricS.pack(side=tk.BOTTOM, fill=tk.X)
+    pathTe.config(xscrollcommand=pathS.set)
+    lyricT.config(xscrollcommand=lyricS.set)
 
     def change_path():
         global path
@@ -195,6 +211,9 @@ def get_path():
             msgbox.showwarning(title="提示", message="您没有选择任何文件夹", parent=pathT)
         else:
             path.set(file)
+            pathTe.config(state=tk.NORMAL)
+            pathTe.delete(0, tk.END)
+            pathTe.insert(tk.INSERT, path.get())
             msgbox.showinfo(title="提示", message="更改成功", parent=pathT)
 
     def change_lyric_path():
@@ -204,14 +223,13 @@ def get_path():
             msgbox.showwarning(title="提示", message="您没有选择任何文件夹", parent=pathT)
         else:
             lyric_path.set(file)
+            lyricT.config(state=tk.NORMAL)
+            lyricT.delete(0, tk.END)
+            lyricT.insert(tk.INSERT, lyric_path.get())
             msgbox.showinfo(title="提示", message="更改成功", parent=pathT)
 
-    tk.Label(master=pathT, text="音乐路径：", font=("", 12)).place(x=0, y=0)
-    tk.Label(master=pathT, text="歌词路径：", font=("", 12)).place(x=0, y=50)
-    tk.Label(master=pathT, textvariable=path, font=("", 12)).place(x=80, y=0)
-    tk.Label(master=pathT, textvariable=lyric_path, font=("", 12)).place(x=80, y=50)
-    tk.Button(master=pathT, text="更改音乐保存路径", font=("", 13), command=change_path).place(x=0, y=100)
-    tk.Button(master=pathT, text="更改歌词保存路径", font=("", 13), command=change_lyric_path).place(x=150, y=100)
+    ttk.Button(master=pathT, text="更改音乐保存路径", command=change_path).place(x=140, y=100)
+    ttk.Button(master=pathT, text="更改歌词保存路径", command=change_lyric_path).place(x=140, y=200)
 
 
 # 打开音乐文件夹
@@ -228,12 +246,15 @@ def en_search(self):
 
 
 def search():
-
     if musicEn.get() == "":
         msgbox.showwarning(title="提示", message="请输入内容!")
         return
 
     if origin.get() == "酷狗音乐":
+        master_type.config(state=tk.DISABLED)
+        no_losses.config(state=tk.DISABLED)
+        hq.config(state=tk.DISABLED)
+        standard.config(state=tk.ACTIVE)
         downloadBtn.config(state=tk.NORMAL)
         lyricCb.config(state=tk.DISABLED)
         music_name = musicEn.get()
@@ -241,6 +262,10 @@ def search():
         info.set(music_list)
 
     elif origin.get() == "QQ音乐VIP":
+        master_type.config(state=tk.NORMAL)
+        no_losses.config(state=tk.NORMAL)
+        hq.config(state=tk.NORMAL)
+        standard.config(state=tk.ACTIVE)
         downloadBtn.config(state=tk.NORMAL)
         lyricCb.config(state=tk.DISABLED)
         music_name = musicEn.get()
@@ -248,6 +273,10 @@ def search():
         info.set(music_list)
 
     elif origin.get() == "QQ音乐":
+        master_type.config(state=tk.DISABLED)
+        no_losses.config(state=tk.DISABLED)
+        hq.config(state=tk.DISABLED)
+        standard.config(state=tk.ACTIVE)
         downloadBtn.config(state=tk.NORMAL)
         lyricCb.config(state=tk.NORMAL)
         music_name = musicEn.get()
@@ -255,6 +284,10 @@ def search():
         info.set(music_list)
 
     elif origin.get() == "酷我音乐":
+        master_type.config(state=tk.DISABLED)
+        no_losses.config(state=tk.DISABLED)
+        hq.config(state=tk.DISABLED)
+        standard.config(state=tk.ACTIVE)
         downloadBtn.config(state=tk.NORMAL)
         lyricCb.config(state=tk.DISABLED)
         music_name = musicEn.get()
@@ -262,6 +295,10 @@ def search():
         info.set(music_list)
 
     elif origin.get() == "咪咕音乐":
+        master_type.config(state=tk.DISABLED)
+        no_losses.config(state=tk.DISABLED)
+        hq.config(state=tk.DISABLED)
+        standard.config(state=tk.ACTIVE)
         downloadBtn.config(state=tk.NORMAL)
         lyricCb.config(state=tk.NORMAL)
         music_name = musicEn.get()
@@ -269,6 +306,10 @@ def search():
         info.set(music_list)
 
     elif origin.get() == "网易云音乐":
+        master_type.config(state=tk.DISABLED)
+        no_losses.config(state=tk.DISABLED)
+        hq.config(state=tk.DISABLED)
+        standard.config(state=tk.ACTIVE)
         downloadBtn.config(state=tk.NORMAL)
         lyricCb.config(state=tk.DISABLED)
         music_name = musicEn.get()
@@ -280,21 +321,35 @@ def search():
         return
 
 
+downloading = False
+down_task = tk.Variable()
+task = []
+down_task.set(task)
+
+
 # 下载音乐
 def download():
+    global downloading, down_task, task
     try:
         n = infoListB.curselection()[0]
     except IndexError:
         msgbox.showwarning(title="提示", message="您还未选择任何音乐")
         return
 
+    downloading = True
     music_name = infoListB.get(n)
 
-    def kg():
+    def kg(dt: tk.Variable, t: list):
+        global downloading
         info_list = kw_download(music_name, n + 1, path.get())
+        t.remove(f"{origin.get()}:{music_name}")
+        dt.set(t)
+        downloading = False
+
         if info_list is False:
             msgbox.showwarning(title="下载", message="下载失败！")
             return
+
         song.set(info_list[0])
         singer.set(info_list[1])
         url.set(info_list[2])
@@ -309,8 +364,16 @@ def download():
 
         msgbox.showinfo(title="酷狗音乐", message=f"下载完成\n{song.get()}")
 
-    def qq_vip():
-        info_list = vip_qq_download(music_name, n + 1, path.get())
+    def qq_vip(dt: tk.Variable, t: list):
+        global downloading
+        br = quality.get()
+        if not isinstance(br, int):
+            br = 4
+        info_list = vip_qq_download(music_name, n + 1, br, path.get())
+        t.remove(f"{origin.get()}:{music_name}")
+        dt.set(t)
+        downloading = False
+
         if info_list is False:
             msgbox.showwarning(title="下载", message="下载失败！")
             return
@@ -328,11 +391,16 @@ def download():
 
         msgbox.showinfo(title="QQ音乐", message=f"音乐下载完成\n{song.get()}")
 
-    def qq():
+    def qq(dt: tk.Variable, t: list):
+        global downloading
         if lyric.get() == "1":
             info_list = qq_download(music_name, n + 1, path.get(), True, lyric_path.get())
         else:
             info_list = qq_download(music_name, n + 1, path.get())
+        t.remove(f"{origin.get()}:{music_name}")
+        dt.set(t)
+        downloading = False
+
         if info_list is False:
             msgbox.showwarning(title="下载", message="下载失败！")
             return
@@ -350,11 +418,16 @@ def download():
 
         msgbox.showinfo(title="QQ音乐", message=f"音乐下载完成\n{song.get()}")
 
-    def mg():
+    def mg(dt: tk.Variable, t: list):
+        global downloading
         if lyric.get() == "1":
             info_list = mg_download(music_name, n + 1, path.get(), True, lyric_path.get())
         else:
             info_list = mg_download(music_name, n + 1, path.get())
+        t.remove(f"{origin.get()}:{music_name}")
+        dt.set(t)
+        downloading = False
+
         if info_list is False:
             msgbox.showwarning(title="下载", message="下载失败！")
             return
@@ -370,8 +443,13 @@ def download():
 
         msgbox.showinfo(title="咪咕音乐", message=f"音乐下载完成\n{song.get()}")
 
-    def wy():
+    def wy(dt: tk.Variable, t: list):
+        global downloading
         info_list = wy_download(music_name, n + 1, path.get())
+        t.remove(f"{origin.get()}:{music_name}")
+        dt.set(t)
+        downloading = False
+
         if info_list is False:
             msgbox.showwarning(title="下载", message="下载失败！")
             return
@@ -389,8 +467,13 @@ def download():
 
         msgbox.showinfo(title="网易云音乐", message=f"音乐下载完成\n{song.get()}")
 
-    def kw():
+    def kw(dt: tk.Variable, t: list):
+        global downloading
         info_list = kw_download(music_name, n + 1, path.get())
+        t.remove(f"{origin.get()}:{music_name}")
+        dt.set(t)
+        downloading = False
+
         if info_list is False:
             msgbox.showwarning(title="下载", message="下载失败！")
             return
@@ -407,28 +490,63 @@ def download():
         msgbox.showinfo(title="酷我音乐", message=f"下载完成\n{song.get()}")
 
     if origin.get() == "酷狗音乐":
-        thread = Thread(target=kg)
+        thread = Thread(target=kg, args=(down_task, task))
+        task.append(f"{origin.get()}:{music_name}")
+        down_task.set(task)
         thread.start()
 
     elif origin.get() == "QQ音乐VIP":
-        thread = Thread(target=qq_vip)
+        thread = Thread(target=qq_vip, args=(down_task, task))
+        task.append(f"{origin.get()}:{music_name}")
+        down_task.set(task)
         thread.start()
 
     elif origin.get() == "QQ音乐":
-        thread = Thread(target=qq)
+        thread = Thread(target=qq, args=(down_task, task))
+        task.append(f"{origin.get()}:{music_name}")
+        down_task.set(task)
         thread.start()
 
     elif origin.get() == "咪咕音乐":
-        thread = Thread(target=mg)
+        thread = Thread(target=mg, args=(down_task, task))
+        task.append(f"{origin.get()}:{music_name}")
+        down_task.set(task)
         thread.start()
 
     elif origin.get() == "网易云音乐":
-        thread = Thread(target=wy)
+        thread = Thread(target=wy, args=(down_task, task))
+        task.append(f"{origin.get()}:{music_name}")
+        down_task.set(task)
         thread.start()
 
     else:
-        thread = Thread(target=kw)
+        thread = Thread(target=kw, args=(down_task, task))
+        task.append(f"{origin.get()}:{music_name}")
+        down_task.set(task)
         thread.start()
+
+
+def downInfo():
+    if downloading is False:
+        msgbox.showinfo(title="提示", message="当前没有任何下载任务")
+        return
+    downloadT = tk.Toplevel(master=window)
+    downloadT.title("下载列表")
+    rSize = f"520x390+{int((sWidth - 520) / 2)}+{int((sHeight - 390) / 2)}"
+    downloadT.geometry(rSize)
+    downloadT.attributes("-alpha", v)
+    downloadT.iconbitmap(r"Image/icon.ico")
+    downloadT.resizable(False, False)
+
+    ttk.Label(master=downloadT, text="下载中:", font=("", 13)).place(x=40, y=15, width=80, height=20)
+    downInfoBox = tk.Listbox(master=downloadT, relief=tk.GROOVE, listvariable=down_task, font=("", 13))
+    downInfoBox.place(x=40, y=45, width=450, height=320)
+
+    dYScroll = ttk.Scrollbar(master=downInfoBox, command=downInfoBox.yview)
+    dYScroll.pack(side=tk.RIGHT, fill=tk.Y)
+    dXScroll = ttk.Scrollbar(master=downInfoBox, command=downInfoBox.xview, orient=tk.HORIZONTAL)
+    dXScroll.pack(side=tk.BOTTOM, fill=tk.X)
+    downInfoBox.config(xscrollcommand=dXScroll.set, yscrollcommand=dYScroll.set)
 
 
 # 顶级菜单栏
@@ -438,13 +556,14 @@ aboutMenu = tk.Menu(master=menu, tearoff=False)
 fileMenu = tk.Menu(master=menu, tearoff=False)
 menu.add_cascade(label="设置", menu=optionMenu)
 menu.add_cascade(label="文件", menu=fileMenu)
+menu.add_command(label="下载列表", command=downInfo)
 menu.add_cascade(label="关于", menu=aboutMenu)
 
 # 关于
 aboutMenu.add_command(
     label="说明", command=lambda: msgbox.showinfo(title="说明", message="作者:ZYKsslm\nQQ:3119964735\n该软件仅供学习交流使用!"))
 aboutMenu.add_command(label="版本", command=lambda: msgbox.showinfo(
-    title="版本", message="ver 0.1.5-GUI\n需要兼容python>=3.10"))
+    title="版本", message="ver 0.1.6-GUI\n需要兼容python>=3.10"))
 
 # 设置:更换主题
 themeMenu = tk.Menu(master=optionMenu, tearoff=False)
@@ -488,34 +607,33 @@ origin.set("音源:未选择")
 ttk.Radiobutton(master=window, text="酷狗音乐", variable=origin, value="酷狗音乐",
                 command=lambda: modeLb.configure(background="#1E90FF", foreground="white")).place(x=50, y=88)
 ttk.Radiobutton(master=window, text="QQ音乐VIP", variable=origin, value="QQ音乐VIP",
-                command=lambda: modeLb.configure(background="gold", foreground="#3CB371")).place(x=150, y=88)
+                command=lambda: modeLb.configure(background="gold", foreground="#3CB371")).place(x=170, y=88)
 ttk.Radiobutton(master=window, text="QQ音乐", variable=origin, value="QQ音乐",
-                command=lambda: modeLb.configure(background="gold", foreground="#3CB371")).place(x=280, y=88)
+                command=lambda: modeLb.configure(background="gold", foreground="#3CB371")).place(x=290, y=88)
 ttk.Radiobutton(master=window, text="酷我音乐", variable=origin, value="酷我音乐",
                 command=lambda: modeLb.configure(background="gold", foreground="#FF4500")).place(x=410, y=88)
 ttk.Radiobutton(master=window, text="网易云音乐", variable=origin, value="网易云音乐",
-                command=lambda: modeLb.configure(background="red", foreground="white")).place(x=540, y=88)
+                command=lambda: modeLb.configure(background="red", foreground="white")).place(x=530, y=88)
 ttk.Radiobutton(master=window, text="咪咕音乐", variable=origin, value="咪咕音乐",
-                command=lambda: modeLb.configure(background="#FF1493", foreground="white")).place(x=660, y=88)
+                command=lambda: modeLb.configure(background="#FF1493", foreground="white")).place(x=650, y=88)
 
 ttk.Label(master=window, text="信息:", font=("", 13)).place(x=510, y=135)
-ttk.Label(master=window, relief="sunken").place(x=510, y=177, width=250, height=320)
+ttk.Label(master=window, relief=tk.SUNKEN).place(x=510, y=177, width=250, height=335)
 modeLb = ttk.Label(master=window, textvariable=origin, font=("", 13))
 modeLb.place(x=520, y=190)
 
 ttk.Label(master=window, text="搜索结果:", font=("", 13)).place(x=50, y=135)
 info = tk.Variable()
 lyric = tk.Variable()
-lyricCb = ttk.Checkbutton(master=window, text="同时下载歌词", variable=lyric)
-lyricCb.config(state=tk.DISABLED)
-lyricCb.place(x=310, y=140)
-infoListB = tk.Listbox(master=window, relief="groove", listvariable=info, font=("", 13))
-infoListB.place(x=50, y=177, width=380, height=320)
+lyricCb = ttk.Checkbutton(master=window, text="同时下载歌词", variable=lyric, state=tk.DISABLED)
+lyricCb.place(x=320, y=140)
+infoListB = tk.Listbox(master=window, relief=tk.GROOVE, listvariable=info, font=("", 13))
+infoListB.place(x=50, y=177, width=380, height=335)
 
 yScroll = ttk.Scrollbar(master=infoListB, command=infoListB.yview)
-yScroll.pack(side="right", fill=tk.Y)
+yScroll.pack(side=tk.RIGHT, fill=tk.Y)
 xScroll = ttk.Scrollbar(master=infoListB, command=infoListB.xview, orient=tk.HORIZONTAL)
-xScroll.pack(side="bottom", fill=tk.X)
+xScroll.pack(side=tk.BOTTOM, fill=tk.X)
 infoListB.config(xscrollcommand=xScroll.set, yscrollcommand=yScroll.set)
 
 song = tk.StringVar()
@@ -536,8 +654,18 @@ urlT = tk.Text(master=window, font=("", 13))
 urlT.place(x=520, y=410, width=230, height=65)
 urlT.insert(tk.INSERT, url.get())
 
-downloadBtn = tk.Button(master=window, state=tk.DISABLED, text="下\n载\n音\n乐", relief="groove", font=("", 13), command=download)
+downloadBtn = tk.Button(master=window, state=tk.DISABLED, text="下\n载\n音\n乐", relief=tk.GROOVE, font=("", 13),
+                        command=download)
 downloadBtn.place(x=450, y=177, width=40, height=100)
+quality = tk.Variable()
+master_type = ttk.Radiobutton(master=window, state=tk.DISABLED, text="母带", variable=quality, value=1)
+master_type.place(x=440, y=300)
+no_losses = ttk.Radiobutton(master=window, state=tk.DISABLED, text="无损", variable=quality, value=2)
+no_losses.place(x=440, y=350)
+hq = ttk.Radiobutton(master=window, state=tk.DISABLED, text="HQ", variable=quality, value=3)
+hq.place(x=440, y=400)
+standard = ttk.Radiobutton(master=window, state=tk.DISABLED, text="标准", variable=quality, value=4)
+standard.place(x=440, y=450)
 
 window.protocol("WM_DELETE_WINDOW", bye)
 window.mainloop()
