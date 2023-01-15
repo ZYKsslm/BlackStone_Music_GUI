@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
-from httpx import Client, stream
-from os import rename
+from httpx import Client
+from os import rename, remove
+from concurrent.futures import ThreadPoolExecutor
 from random import choice
 from re import sub, compile
 from filetype import guess
@@ -264,7 +265,7 @@ def vip_qq_get_music(name):
     return choice_list
 
 
-def vip_qq_download(name, n, br, path):
+def vip_qq_download(name, n, br, path, slice_num=20):
     headers = {
         "User-Agent": get_user_agent()
     }
@@ -300,16 +301,56 @@ def vip_qq_download(name, n, br, path):
         with open(fr"{path}/{song}-{singer}.{kind.extension}", "wb+") as f:
             f.write(content)
     else:
-        with Client(headers=headers, follow_redirects=True, timeout=None) as client:
-            total = client.head(url=music).headers["Content-Length"]
-        with stream(method="GET", url=music, headers=headers, follow_redirects=True, timeout=None) as r:
-            with open(fr"{path}/{song}-{singer}", "wb+") as f:
-                for data in r.iter_bytes(chunk_size=64*1024):
-                    f.write(data)
+        # 多线程流式并发响应
 
-                kind = guess(f)
+        def get_slice():
+            with Client(headers=headers, follow_redirects=True, timeout=None) as cli:
+                total = int(cli.head(url=music).headers["Content-Length"])
+            step = total // slice_num
+            arr = list(range(0, total, step))
+            res = {}
+            for li in range(len(arr) - 1):
+                s_pos = arr[li]
+                e_pos = arr[li + 1] - 1
+                res.update(
+                    {
+                        li: [s_pos, e_pos]
+                    }
+                )
 
-        rename(fr"{path}/{song}-{singer}", fr"{path}/{song}-{singer}.{kind.extension}")
+            res[slice_num - 1][-1] = total - 1
+
+            return res
+
+        def stream_download(ranges):
+            order, ranges = ranges
+            headers.update(
+                {
+                    "Range": f"bytes={ranges[0]}-{ranges[1]}"
+                }
+            )
+            with Client(headers=headers, follow_redirects=True, timeout=None) as cli:
+                r = cli.get(url=music)
+                with open(f"{path}/{song}-{singer}_{order}", "wb") as m:
+                    m.write(r.content)
+
+        def combine():
+            with open(f"{path}/{song}-{singer}", "wb+") as m:
+                for o in range(slice_num):
+                    with open(f"{path}/{song}-{singer}_{o}", "rb") as dt:
+                        m.write(dt.read())
+                    remove(f"{path}/{song}-{singer}_{o}")
+
+                k = guess(m)
+
+            rename(f"{path}/{song}-{singer}", f"{path}/{song}-{singer}.{k.extension}")
+
+        rgs = get_slice()
+        with ThreadPoolExecutor(slice_num) as pool:
+            for i in rgs.items():
+                pool.submit(stream_download, i)
+
+        combine()
 
     return [song, singer, music_url]
 
