@@ -38,6 +38,10 @@ with open(r"config.json", "r") as f:
 
     img_file = setting["img_file"]
 
+    court_num = tk.Variable()
+    court_num.set(setting["court_num"])
+
+
 # 设置主窗体样式
 window.tk.call("set_theme", wTheme)
 # 透明度
@@ -61,6 +65,7 @@ def save_setting():
             "path": path.get(),
             "lyric_path": lyric_path.get(),
             "img_file": img_file,
+            "court_num": court_num.get()
         }
 
         dump(config, s)
@@ -364,12 +369,12 @@ def download():
 
         msgbox.showinfo(title="酷狗音乐", message=f"下载完成\n{song.get()}")
 
-    def qq_vip(dt: tk.Variable, t: list):
+    def qq_vip(dt: tk.Variable, t: list, num: int):
         global downloading
         br = quality.get()
         if not isinstance(br, int):
             br = 4
-        info_list = vip_qq_download(music_name, n + 1, br, path.get())
+        info_list = vip_qq_download(music_name, n + 1, br, path.get(), num)
         t.remove(f"{origin.get()}:{music_name}")
         dt.set(t)
         downloading = False
@@ -496,7 +501,7 @@ def download():
         thread.start()
 
     elif origin.get() == "QQ音乐VIP":
-        thread = Thread(target=qq_vip, args=(down_task, task))
+        thread = Thread(target=qq_vip, args=(down_task, task, court_num.get()))
         task.append(f"{origin.get()}:{music_name}")
         down_task.set(task)
         thread.start()
@@ -549,6 +554,33 @@ def downInfo():
     downInfoBox.config(xscrollcommand=dXScroll.set, yscrollcommand=dYScroll.set)
 
 
+def concurrent_num():
+    msgbox.showinfo(title="提示", message="下载并发数在多线程并发下载时起效，请视机器性能填写，默认20线程")
+    courtT = tk.Toplevel(master=window)
+    courtT.title("设置下载并发数")
+    rSize = f"300x160+{int((sWidth - 200) / 2)}+{int((sHeight - 100) / 2)}"
+    courtT.geometry(rSize)
+    courtT.attributes("-alpha", v)
+    courtT.iconbitmap(r"Image/icon.ico")
+    courtT.resizable(False, False)
+    courtEn = ttk.Entry(master=courtT, font=("", 13))
+    courtEn.insert(0, court_num.get())
+    courtEn.place(x=100, y=30, width=100, height=33)
+
+    def check_court_num(num):
+        try:
+            num = int(num)
+        except ValueError:
+            msgbox.showwarning(title="提示", message="输入不合法", parent=courtT)
+            courtEn.delete(0, tk.END)
+            courtEn.insert(0, court_num.get())
+        else:
+            court_num.set(num)
+            msgbox.showinfo(title="提示", message="设置成功", parent=courtT)
+
+    ttk.Button(master=courtT, text="完成", command=lambda: check_court_num(courtEn.get())).place(x=105, y=90)
+
+
 # 顶级菜单栏
 menu = tk.Menu(master=window)
 optionMenu = tk.Menu(master=menu, tearoff=False)
@@ -563,7 +595,10 @@ menu.add_cascade(label="关于", menu=aboutMenu)
 aboutMenu.add_command(
     label="说明", command=lambda: msgbox.showinfo(title="说明", message="作者:ZYKsslm\nQQ:3119964735\n该软件仅供学习交流使用!"))
 aboutMenu.add_command(label="版本", command=lambda: msgbox.showinfo(
-    title="版本", message="ver 0.1.6-GUI\n需要兼容python>=3.10"))
+    title="版本", message="ver 0.1.7-GUI\n需要兼容python>=3.10"))
+
+# 设置:设置并发数
+optionMenu.add_command(label="设置下载并发数", command=concurrent_num)
 
 # 设置:更换主题
 themeMenu = tk.Menu(master=optionMenu, tearoff=False)
