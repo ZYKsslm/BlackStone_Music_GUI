@@ -706,7 +706,7 @@ menu.add_cascade(label="关于", menu=aboutMenu)
 aboutMenu.add_command(
     label="说明", command=lambda: msgbox.showinfo(title="说明", message="作者:ZYKsslm\nQQ:3119964735\n该软件仅供学习交流使用!"))
 aboutMenu.add_command(label="版本", command=lambda: msgbox.showinfo(
-    title="版本", message="ver 0.1.7-GUI\n需要兼容python>=3.10"))
+    title="版本", message="ver 0.1.8-GUI\n需要兼容python>=3.10"))
 
 # 设置:更换主题
 themeMenu = tk.Menu(master=optionMenu, tearoff=False)
