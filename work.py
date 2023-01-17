@@ -3,7 +3,7 @@ from httpx import Client
 from os import rename, remove
 from concurrent.futures import ThreadPoolExecutor
 from random import choice
-from re import sub, compile
+from re import sub, compile, findall
 from filetype import guess
 
 try:
@@ -34,6 +34,40 @@ def get_user_agent():
     """获取随机UA"""
     user_agent = choice(choice(list(choice(user_agent_json).values())))
     return user_agent
+
+
+# 解析歌单
+def import_songlist(info):
+    try:
+        songlist_id = int(info)
+    except ValueError:
+        try:
+            songlist_id = findall(r'/(\d+)', info)[0]
+        except IndexError:
+            return False
+
+    headers = {
+        "User-Agent": get_user_agent()
+    }
+    url = f"https://c.y.qq.com/v8/fcg-bin/fcg_v8_playlist_cp.fcg?cv=10000&ct=19&newsong=1&tpl=wk&id={songlist_id}&g_tk=5381&platform=mac&g_tk_new_20200303=5381&loginUin=0&hostUin=0&format=json&inCharset=GB2312&outCharset=utf-8&notice=0&platform=jqspaframe.json&needNewCode=0"
+
+    with Client(headers=headers, timeout=None) as client:
+        resp = client.get(url=url)
+        data = resp.json()["data"]["cdlist"][0]
+
+    song_list = data["songlist"]
+    tags = ""
+    for i in data["tags"]:
+        tags += f":{i['name']}"
+
+    songlist_info = f"歌单名:{data['dissname']}\n" \
+                    f"创建者:{data['nickname']}\n" \
+                    f"简介:{data['desc']}\n" \
+                    f"总歌数:{data['total_song_num']}\n" \
+                    f"浏览人数:{data['visitnum']}\n" \
+                    f"标签:{tags}"
+
+    return songlist_info, [f"{i['name']}-{i['singer'][0]['name']}" for i in song_list], data["songids"].split(",")
 
 
 # 酷我音乐
@@ -265,16 +299,22 @@ def vip_qq_get_music(name):
     return choice_list
 
 
-def vip_qq_download(name, n, br, path, slice_num=20):
+def vip_qq_download(br, path, name=None, n=None, songid=None, slice_num=20):
     headers = {
         "User-Agent": get_user_agent()
     }
 
-    data = {
-        "msg": name,
-        "n": n,
-        "br": br
-    }
+    if songid is None:
+        data = {
+            "msg": name,
+            "n": n,
+            "br": br
+        }
+    else:
+        data = {
+            "songid": songid,
+            "br": br
+        }
 
     with Client(headers=headers, params=data, follow_redirects=True, timeout=None) as client:
         resp = client.get(url=qq_vip_api)
@@ -433,13 +473,24 @@ def wy_get_music(name):
     }
 
     with Client(headers=headers, params=data, follow_redirects=True, timeout=None) as client:
-        resp = client.get(url=qq_api)
+        resp = client.get(url=wy_api)
         music_info = resp.json()["data"]
 
     choice_list = []
     for i in music_info:
         music_name = i["song"]
-        singers = i["singers"]
+        singer_list = i["singers"]
+        singer_num = len(singer_list)
+        singers = ""
+        if singer_num > 1:
+            for s in range(singer_num):
+                s += 1
+                if s == singer_num:
+                    singers += f"{singer_list[s - 1]}"
+                else:
+                    singers += f"{singer_list[s - 1]}、"
+        else:
+            singers = singer_list[0]
         choose = f"{music_name}-{singers}"
         choice_list.append(choose)
 
@@ -460,8 +511,8 @@ def wy_download(name, n, path):
         resp = client.get(url=wy_api)
         music_info = resp.json()["data"]
 
-    song = sub(r'[\\/:*?"<>|]', "", music_info["Music"])
-    singer = sub(r'[\\/:*?"<>|]', "", music_info["Singer"])
+    song = set_name(music_info["Music"])
+    singer = set_name(music_info["Singer"])
     try:
         music = music_info["dataUrl"]
         music_url = music_info["Url"]
