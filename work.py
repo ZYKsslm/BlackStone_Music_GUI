@@ -3,20 +3,16 @@ from httpx import Client
 from os import rename, remove
 from concurrent.futures import ThreadPoolExecutor
 from random import choice
-from re import sub, compile, findall
+from re import sub, compile, findall, S
 from filetype import guess
+from ujson import load, dump, loads
 
-try:
-    from ujson import load, dump
-except ModuleNotFoundError:
-    from json import load, dump
+kg_api = "http://ovooa.caonm.net/API/kgdg/api.php"
+mg_api = "http://ovooa.caonm.net/API/migu/api.php"
+qq_vip_api = "http://ovooa.caonm.net/API/QQ_Music"
+qq_api = "http://ovooa.caonm.net/API/qqdg/api.php"
+wy_api = "http://ovooa.caonm.net/API/wydg/api.php"
 
-kw_api = "http://ovooa.com/API/kwdg/api.php"
-kg_api = "http://ovooa.com/API/kgdg/api.php"
-mg_api = "http://ovooa.com/API/migu/api.php"
-qq_vip_api = "http://ovooa.com/API/QQ_Music"
-qq_api = "http://ovooa.com/API/qqdg/api.php"
-wy_api = "http://ovooa.com/API/wydg/api.php"
 
 with open("User-Agent.json") as u:
     user_agent_json = load(u)
@@ -70,68 +66,6 @@ def import_songlist(info):
     return songlist_info, [f"{i['name']}-{i['singer'][0]['name']}" for i in song_list], data["songids"].split(",")
 
 
-# 酷我音乐
-def kw_get_music(name):
-    headers = {
-        "User-Agent": get_user_agent()
-    }
-
-    data = {
-        "msg": name,
-        "sc": 50
-    }
-
-    with Client(headers=headers, params=data, follow_redirects=True, timeout=None) as client:
-        resp = client.get(url=kw_api)
-        music_info = resp.json()["data"]
-
-    choice_list = []
-    for i in music_info:
-        music_name = i["song"]
-        singers = i["singer"]
-
-        choose = f"{music_name}-{singers}"
-        choice_list.append(choose)
-
-    return choice_list
-
-
-def kw_download(name, n, path):
-    headers = {
-        "User-Agent": get_user_agent()
-    }
-
-    data = {
-        "msg": name,
-        "n": n,
-    }
-
-    with Client(headers=headers, params=data, follow_redirects=True, timeout=None) as client:
-        resp = client.get(url=kw_api)
-        music_info = resp.json()["data"]
-
-    song = set_name(music_info["musicname"])
-    singer = set_name(music_info["singer"])
-
-    try:
-        music = music_info["musicurl"]
-    except KeyError:
-        return False
-
-    with Client(headers=headers, follow_redirects=True, timeout=None) as client:
-        resp = client.get(url=music)
-        content = resp.content
-
-    kind = guess(content)
-    if kind is None:
-        return False
-
-    with open(fr"{path}/{song}-{singer}.{kind.extension}", "wb+") as f:
-        f.write(content)
-
-    return [song, singer]
-
-
 # 酷狗音乐
 def kg_get_music(name):
     headers = {
@@ -145,17 +79,19 @@ def kg_get_music(name):
 
     with Client(headers=headers, params=data, follow_redirects=True, timeout=None) as client:
         resp = client.get(url=kg_api)
-        music_info = resp.json()["data"]
+        music_info = loads(findall(r'"data": (\[.*\])', resp.text, S)[0])
 
     choice_list = []
+    name_list = []
     for i in music_info:
         music_name = i["name"]
         singers = i["singer"]
-
         choose = f"{music_name}-{singers}"
+
+        name_list.append(music_name)
         choice_list.append(choose)
 
-    return choice_list
+    return choice_list, name_list
 
 
 def kg_download(name, n, path):
@@ -171,9 +107,11 @@ def kg_download(name, n, path):
     with Client(headers=headers, params=data, follow_redirects=True, timeout=None) as client:
         resp = client.get(url=kg_api)
         try:
-            music_info = resp.json()["data"]
-        except KeyError:
+            music_info = resp.json() 
+        except:
             return False
+        else:
+            music_info = music_info["data"]
 
     song = set_name(music_info["song"])
     singer = set_name(music_info["singer"])
@@ -210,17 +148,19 @@ def mg_get_music(name):
 
     with Client(headers=headers, params=data, follow_redirects=True, timeout=None) as client:
         resp = client.get(url=mg_api)
-        music_info = resp.json()["data"]
+        music_info = loads(findall(r'"data": (\[.*\]),', resp.text, S)[0])
 
     choice_list = []
+    name_list = []
     for i in music_info:
         music_name = i["song"]
         singers = i["singer"]
 
         choose = f"{music_name}-{singers}"
+        name_list.append(music_name)
         choice_list.append(choose)
 
-    return choice_list
+    return choice_list, name_list
 
 
 def mg_download(name, n, path, get_lyric=False, lyric_path=None):
@@ -279,42 +219,27 @@ def vip_qq_get_music(name):
         music_info = resp.json()["data"]
 
     choice_list = []
+    songids = []
     for i in music_info:
         music_name = i["song"]
-        singer_list = i["singers"]
-        singer_num = len(singer_list)
-        singers = ""
-        if singer_num > 1:
-            for s in range(singer_num):
-                s += 1
-                if s == singer_num:
-                    singers += f"{singer_list[s - 1]}"
-                else:
-                    singers += f"{singer_list[s - 1]}、"
-        else:
-            singers = singer_list[0]
+        singers = i["singer"]
+        songid = i["songid"]
         choose = f"{music_name}-{singers}"
         choice_list.append(choose)
+        songids.append(songid)
 
-    return choice_list
+    return choice_list, songids
 
 
-def vip_qq_download(br, path, name=None, n=None, songid=None, slice_num=20):
+def vip_qq_download(br, path, songid, slice_num=20):
     headers = {
         "User-Agent": get_user_agent()
     }
 
-    if songid is None:
-        data = {
-            "msg": name,
-            "n": n,
-            "br": br
-        }
-    else:
-        data = {
-            "songid": songid,
-            "br": br
-        }
+    data = {
+        "songid": songid,
+        "br": br
+    }
 
     with Client(headers=headers, params=data, follow_redirects=True, timeout=None) as client:
         resp = client.get(url=qq_vip_api)
@@ -411,13 +336,16 @@ def qq_get_music(name):
         music_info = resp.json()["data"]
 
     choice_list = []
+    name_list = []
     for i in music_info:
         music_name = i["song"]
         singers = i["singers"]
         choose = f"{music_name}-{singers}"
+        
+        name_list.append(music_name)
         choice_list.append(choose)
 
-    return choice_list
+    return choice_list, name_list
 
 
 def qq_download(name, n, path, get_lyric=False, lyric_path=None):
@@ -477,6 +405,7 @@ def wy_get_music(name):
         music_info = resp.json()["data"]
 
     choice_list = []
+    name_list = []
     for i in music_info:
         music_name = i["song"]
         singer_list = i["singers"]
@@ -491,10 +420,11 @@ def wy_get_music(name):
                     singers += f"{singer_list[s - 1]}、"
         else:
             singers = singer_list[0]
+        name_list.append(music_name)
         choose = f"{music_name}-{singers}"
         choice_list.append(choose)
 
-    return choice_list
+    return choice_list, name_list
 
 
 def wy_download(name, n, path):
@@ -514,8 +444,8 @@ def wy_download(name, n, path):
     song = set_name(music_info["Music"])
     singer = set_name(music_info["Singer"])
     try:
-        music = music_info["dataUrl"]
-        music_url = music_info["Url"]
+        music = music_info["Url"]
+        music_url = music_info["Music_Url"]
     except KeyError:
         return False
 
