@@ -8,8 +8,8 @@ from os import execl, startfile, getcwd
 from os.path import join
 from sys import executable, argv
 from threading import Thread
-from time import sleep
 from work import *
+
 
 # 主窗口
 window = tk.Tk()
@@ -23,6 +23,7 @@ window.iconbitmap(r"Image/icon.ico")
 window.title("BlackStone_Music_GUI")
 # 美化脚本
 window.tk.call("source", r"Azure-ttk-theme/azure.tcl")
+
 
 # 读取设置
 with open(r"config.json", "r") as f:
@@ -254,8 +255,11 @@ def quick_search():
 def en_search(self):
     quick_search()
 
-
+songs = []
 def search():
+
+    global songs
+
     if musicEn.get() == "":
         msgbox.showwarning(title="提示", message="请输入内容!")
         return
@@ -268,7 +272,7 @@ def search():
         downloadBtn.config(state=tk.NORMAL)
         lyricCb.config(state=tk.DISABLED)
         music_name = musicEn.get()
-        music_list = kg_get_music(music_name)
+        music_list, songs = kg_get_music(music_name)
         info.set(music_list)
 
     elif origin.get() == "QQ音乐VIP":
@@ -279,7 +283,7 @@ def search():
         downloadBtn.config(state=tk.NORMAL)
         lyricCb.config(state=tk.DISABLED)
         music_name = musicEn.get()
-        music_list = vip_qq_get_music(music_name)
+        music_list, songs = vip_qq_get_music(music_name)
         info.set(music_list)
 
     elif origin.get() == "QQ音乐":
@@ -290,18 +294,7 @@ def search():
         downloadBtn.config(state=tk.NORMAL)
         lyricCb.config(state=tk.NORMAL)
         music_name = musicEn.get()
-        music_list = qq_get_music(music_name)
-        info.set(music_list)
-
-    elif origin.get() == "酷我音乐":
-        master_type.config(state=tk.DISABLED)
-        no_losses.config(state=tk.DISABLED)
-        hq.config(state=tk.DISABLED)
-        standard.config(state=tk.ACTIVE)
-        downloadBtn.config(state=tk.NORMAL)
-        lyricCb.config(state=tk.DISABLED)
-        music_name = musicEn.get()
-        music_list = kw_get_music(music_name)
+        music_list, songs = qq_get_music(music_name)
         info.set(music_list)
 
     elif origin.get() == "咪咕音乐":
@@ -312,7 +305,7 @@ def search():
         downloadBtn.config(state=tk.NORMAL)
         lyricCb.config(state=tk.NORMAL)
         music_name = musicEn.get()
-        music_list = mg_get_music(music_name)
+        music_list, songs = mg_get_music(music_name)
         info.set(music_list)
 
     elif origin.get() == "网易云音乐":
@@ -323,7 +316,7 @@ def search():
         downloadBtn.config(state=tk.NORMAL)
         lyricCb.config(state=tk.DISABLED)
         music_name = musicEn.get()
-        music_list = wy_get_music(music_name)
+        music_list, songs = wy_get_music(music_name)
         info.set(music_list)
 
     else:
@@ -346,10 +339,10 @@ def download():
         msgbox.showwarning(title="提示", message="您还未选择任何音乐")
         return
 
-    music_name = infoListB.get(n)
+    music_name = songs[n]
 
     def kg(dt: tk.Variable, t: list):
-        info_list = kw_download(music_name, n + 1, path.get())
+        info_list = kg_download(music_name, n + 1, path.get())
         t.remove(f"{origin.get()}:{music_name}")
         dt.set(t)
 
@@ -375,7 +368,7 @@ def download():
         br = quality.get()
         if not isinstance(br, int):
             br = 3
-        info_list = vip_qq_download(br=br, path=path.get(), name=music_name, n=n+1, slice_num=num)
+        info_list = vip_qq_download(br=br, path=path.get(), songid=music_name, slice_num=num)
         t.remove(f"{origin.get()}:{music_name}")
         dt.set(t)
 
@@ -466,25 +459,6 @@ def download():
 
         msgbox.showinfo(title="网易云音乐", message=f"音乐下载完成\n{song.get()}")
 
-    def kw(dt: tk.Variable, t: list):
-        info_list = kw_download(music_name, n + 1, path.get())
-        t.remove(f"{origin.get()}:{music_name}")
-        dt.set(t)
-
-        if info_list is False:
-            msgbox.showwarning(title="下载", message="下载失败！")
-            return
-        song.set(info_list[0])
-        singer.set(info_list[1])
-
-        songT.delete("1.0", tk.END)
-        singerT.delete("1.0", tk.END)
-        urlT.delete("1.0", tk.END)
-
-        songT.insert(tk.INSERT, song.get())
-        singerT.insert(tk.INSERT, singer.get())
-
-        msgbox.showinfo(title="酷我音乐", message=f"下载完成\n{song.get()}")
 
     if origin.get() == "酷狗音乐":
         thread = Thread(target=kg, args=(down_task, task))
@@ -512,12 +486,6 @@ def download():
 
     elif origin.get() == "网易云音乐":
         thread = Thread(target=wy, args=(down_task, task))
-        task.append(f"{origin.get()}:{music_name}")
-        down_task.set(task)
-        thread.start()
-
-    elif origin.get() == "酷我音乐":
-        thread = Thread(target=kw, args=(down_task, task))
         task.append(f"{origin.get()}:{music_name}")
         down_task.set(task)
         thread.start()
@@ -636,43 +604,13 @@ def songlist():
         thread = Thread(target=qq_down)
         thread.start()
 
-    def down_all():
-        check = msgbox.askyesno(title="提示", message="若歌曲数量过多，全部并发下载可能会被服务器识别为恶意攻击而导致IP被暂时封禁，确认要直接下载全部吗？", parent=songlistT, default="no")
-        if check is False:
-            return
-        br = quality.get()
-        if not isinstance(br, int):
-            br = 3
-
-        def qq_down(songid, n):
-            global down_task, task
-            sleep(1)
-            name = f"QQ音乐VIP:{songListB.get(n)}"
-            task.append(name)
-            down_task.set(task)
-            song_info = vip_qq_download(br=br, path=path.get(), songid=songid)
-
-            if song_info is False:
-                task.remove(name)
-                down_task.set(task)
-                return
-
-            music_info = f"{song_info[0]}-{song_info[1]}"
-            task.remove(name)
-            down_task.set(task)
-            msgbox.showinfo(title="QQ音乐", message=f"音乐下载完成\n{music_info}", parent=songlistT)
-
-        for i in range(len(songids)):
-            thread = Thread(target=qq_down, args=(songids[i], i))
-            thread.start()
 
     songlistEn = ttk.Entry(master=songlistT, font=("", 13))
     songlistEn.insert(0, "请输入歌单链接或歌单id")
     songlistEn.place(x=140, y=30, width=440, height=33)
 
     tk.Button(master=songlistT, text="导入", font=("", 13), command=ipt_songlist).place(x=500, y=80, width=80, height=30)
-    ttk.Button(master=songlistT, text="下\n载\n选\n中", command=down).place(x=540, y=140, width=40, height=100)
-    ttk.Button(master=songlistT, text="下\n载\n全\n部", command=down_all).place(x=540, y=270, width=40, height=100)
+    tk.Button(master=songlistT, text="下\n载\n选\n中", font=("", 13), command=down).place(x=540, y=140, width=40, height=100)
 
     ttk.Radiobutton(master=songlistT, text="母带", variable=quality, value=1).place(x=140, y=75)
     ttk.Radiobutton(master=songlistT, text="无损", variable=quality, value=2).place(x=220, y=75)
@@ -706,7 +644,7 @@ menu.add_cascade(label="关于", menu=aboutMenu)
 aboutMenu.add_command(
     label="说明", command=lambda: msgbox.showinfo(title="说明", message="作者:ZYKsslm\nQQ:3119964735\n该软件仅供学习交流使用!"))
 aboutMenu.add_command(label="版本", command=lambda: msgbox.showinfo(
-    title="版本", message="ver 0.1.8-GUI\n需要兼容python>=3.10"))
+    title="版本", message="ver 0.1.9-GUI\n需要兼容python>=3.8"))
 
 # 设置:更换主题
 themeMenu = tk.Menu(master=optionMenu, tearoff=False)
@@ -761,12 +699,10 @@ ttk.Radiobutton(master=window, text="QQ音乐VIP", variable=origin, value="QQ音
                 command=lambda: modeLb.configure(background="gold", foreground="#3CB371")).place(x=170, y=88)
 ttk.Radiobutton(master=window, text="QQ音乐", variable=origin, value="QQ音乐",
                 command=lambda: modeLb.configure(background="gold", foreground="#3CB371")).place(x=290, y=88)
-ttk.Radiobutton(master=window, text="酷我音乐", variable=origin, value="酷我音乐",
-                command=lambda: modeLb.configure(background="gold", foreground="#FF4500")).place(x=410, y=88)
 ttk.Radiobutton(master=window, text="网易云音乐", variable=origin, value="网易云音乐",
-                command=lambda: modeLb.configure(background="red", foreground="white")).place(x=530, y=88)
+                command=lambda: modeLb.configure(background="red", foreground="white")).place(x=410, y=88)
 ttk.Radiobutton(master=window, text="咪咕音乐", variable=origin, value="咪咕音乐",
-                command=lambda: modeLb.configure(background="#FF1493", foreground="white")).place(x=650, y=88)
+                command=lambda: modeLb.configure(background="#FF1493", foreground="white")).place(x=530, y=88)
 
 ttk.Label(master=window, text="搜索结果:", font=("", 13)).place(x=50, y=135)
 info = tk.Variable()
