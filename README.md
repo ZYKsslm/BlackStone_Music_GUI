@@ -5,8 +5,14 @@
 ![sample](sample.jpg)
 
 ### :label: 说明
-1. 本工具下载音乐使用的是[api](http://ovooa.caonm.net/)的接口
-2. GUI使用Python自带的tkinter库进行制作，相对来说比较简陋，所以使用了[Azure-ttk-theme](https://github.com/rdbende/Azure-ttk-theme)项目进行美化
+1. 下载音乐使用的是[独角兽api](http://ovooa.caonm.net/)的接口
+2. GUI重新使用PySide6制作
+
+该项目使用来自Qt for Python项目的官方Python模块PySide6，它提供了对完整Qt 6.0+框架的访问。PySide6可以在开源(LGPLv3/GPLv2)和商业许可下使用。欲了解更多信息，请参阅[Qt许可页面](https://www.qt.io/licensing/)。
+
+This project uses PySide6, the official Python module from the Qt for Python project, which provides access to the complete Qt 6.0+ framework. PySide6 is available under both Open Source (LGPLv3/GPLv2) and commercial license. For more information, refer to the [Qt Licensing page](https://www.qt.io/licensing/).
 
 ---
-:heart: 如果喜欢本工具，就请点个:star:吧
+*接口较不稳定，如出现异常请过一会儿再试或提issue*
+
+:heart: 如果喜欢本项目，就请点个:star:吧
