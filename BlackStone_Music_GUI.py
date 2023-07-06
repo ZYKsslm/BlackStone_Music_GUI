@@ -1,758 +1,353 @@
-# -*- coding: utf-8 -*-
-import tkinter as tk
-from tkinter import ttk
-from PIL import Image, ImageTk
-import tkinter.messagebox as msgbox
-import tkinter.filedialog as tkFile
-from os import execl, startfile, getcwd
-from os.path import join
-from sys import executable, argv
-from threading import Thread
+import sys
+import os
+from PIL import Image, ImageQt
+
+from PySide6.QtWidgets import *
+from qdarkstyle.dark.palette import DarkPalette
+from qdarkstyle.light.palette import LightPalette
+from qdarkstyle import load_stylesheet
+from ujson import dump
+
+from Ui_mainWidget import Ui_mainWidget
+from sponseorshipWindow import *
 from work import *
 
 
-# 主窗口
-window = tk.Tk()
-sWidth = window.winfo_screenwidth()
-sHeight = window.winfo_screenheight()
-# 让主窗口处于屏幕中间
-wSize = f"800x600+{int((sWidth - 800) / 2)}+{int((sHeight - 600) / 2)}"
-window.geometry(wSize)
-window.resizable(False, False)
-window.iconbitmap(r"Image/icon.ico")
-window.title("BlackStone_Music_GUI")
-# 美化脚本
-window.tk.call("source", r"Azure-ttk-theme/azure.tcl")
+__version__ = "v0.2.0"
 
 
-# 读取设置
-with open(r"config.json", "r") as f:
-    setting = load(f)
+class MainWindow(QWidget, Ui_mainWidget):
+    def __init__(self):
+        super().__init__()
+        self.config()
+        self.setupUi(self)
+        self.bind()
 
-    wTheme = setting["wTheme"]
-    v = setting["v"]
+    def config(self):
+        with open("config.json", "r", encoding="utf-8") as f:
+            configs = load(f)
+        self.theme = configs["theme"]
+        self.v = configs["v"]
+        self.img_file = configs["img_file"]
 
-    path = tk.StringVar()
-    path.set(setting["path"])
+        music_path = configs["music_path"]
+        lyric_path = configs["lyric_path"]
 
-    lyric_path = tk.StringVar()
-    lyric_path.set(setting["lyric_path"])
+        if music_path == "./Download":
+            music_path = os.path.join(os.getcwd(), "Download")
+        if lyric_path == "./Download":
+            lyric_path = os.path.join(os.getcwd(), "Download")
 
-    img_file = setting["img_file"]
+        # 定义初始下载器对象
+        self.downloader = Downloader(self, configs["ua"], configs["thread_num"], music_path, lyric_path)
 
-    court_num = tk.Variable()
-    court_num.set(setting["court_num"])
+    def setupUi(self, mainWidget):
+        super().setupUi(mainWidget)
+        self.setFixedSize(1040, 585)
+        self.setWindowOpacity(self.v)
+        self.change_theme(app, self.theme)
+        if self.img_file is not None:
+            self.bgLabel.setPixmap(QPixmap(self.img_file))
 
-# 设置主窗体样式
-window.tk.call("set_theme", wTheme)
-# 透明度
-window.attributes("-alpha", v)
+        self.verLabel.setText(__version__)
+        self.impMenu = QMenu(self)
+        self.imp_menu = self.impMenu.addAction("QQ音乐")
+        self.impBtn.setMenu(self.impMenu)
+        self.source_group = QButtonGroup(self)
+        self.source_group.addButton(self.source_1, 1)
+        self.source_group.addButton(self.source_2, 2)
+        self.source_group.addButton(self.source_3, 3)
+        self.source_group.addButton(self.source_4, 4)
+        self.source_group.addButton(self.source_5, 5)
+        self.source_group.addButton(self.source_6, 6)
+        self.musicPathLineEdit.setText(self.downloader.music_path)
+        self.lyricPathLineEdit.setText(self.downloader.lyric_path)
+        self.comboBox.addItems(["默认", "明亮", "暗黑"])
+        self.comboBox.setCurrentText(self.theme)
+        self.visSlider.setMinimum(1)
+        self.visSlider.setMaximum(10)
+        self.visSlider.setSingleStep(1)
+        self.visSlider.setValue(7)
+        self.threadLineEdit.setText(str(self.downloader.thread_num))
+        self.quality_group = QButtonGroup()
+        self.quality_group.addButton(self.qCheck_1, 1)
+        self.quality_group.addButton(self.qCheck_2, 2)
+        self.quality_group.addButton(self.qCheck_3, 3)
+        self.quality_group.addButton(self.qCheck_4, 4)
+        self.qCheck_1.setEnabled(False)
+        self.qCheck_2.setEnabled(False)
+        self.qCheck_3.setEnabled(False)
+        self.qCheck_4.setEnabled(False)
+        self.imp_quality_group = QButtonGroup()
+        self.imp_quality_group.addButton(self.qCheck_5, 1)
+        self.imp_quality_group.addButton(self.qCheck_6, 2)
+        self.imp_quality_group.addButton(self.qCheck_7, 3)
+        self.imp_quality_group.addButton(self.qCheck_8, 4)
+        # self.qCheck_5.setEnabled(False)
+        # self.qCheck_6.setEnabled(False)
+        # self.qCheck_7.setEnabled(False)
+        # self.qCheck_8.setEnabled(False)
+        self.lyricDownBtn.setEnabled(False)
+        self.importLyricDownBtn.setEnabled(False)
+        # TODO
+        self.source_6.setEnabled(False)
 
-# 壁纸
-wallLb = ttk.Label(master=window)
-wallLb.pack()
-if img_file is not None:
-    img = Image.open(img_file)
-    img = ImageTk.PhotoImage(img)
-    wallLb.config(image=img)
+    def sponsorshipWindowShow(self):
+        self.sponsorshipWindow = sponsorshipWindow()
+        self.sponsorshipWindow.show()
 
-
-# 自动保存设置
-def save_setting():
-    with open(r"config.json", "w") as s:
-        config = {
-            "wTheme": wTheme,
-            "v": v,
-            "path": path.get(),
-            "lyric_path": lyric_path.get(),
-            "img_file": img_file,
-            "court_num": court_num.get()
-        }
-
-        dump(config, s)
-
-
-# 切换亮主题
-def light_theme():
-    global wTheme
-    wTheme = "light"
-    if window.tk.call("ttk::style", "theme", "use") == "azure-light":
-        return
-    else:
-        window.tk.call("set_theme", "light")
-
-
-# 切换暗主题
-def dark_theme():
-    global wTheme
-    wTheme = "dark"
-    if window.tk.call("ttk::style", "theme", "use") == "azure-dark":
-        return
-    else:
-        window.tk.call("set_theme", "dark")
-
-
-# 设置窗口透明度
-def vis():
-    # 窗口设置
-    visT = tk.Toplevel(master=window)
-    visT.title("透明度设置")
-    vSize = f"250x200+{int((sWidth - 250) / 2)}+{int((sHeight - 200) / 2)}"
-    visT.geometry(vSize)
-    visT.attributes("-alpha", v)
-    visT.resizable(False, False)
-    visT.iconbitmap(r"Image/icon.ico")
-
-    def change_vis(vf):
-        global v
-        window.attributes("-alpha", vf)
-        visT.attributes("-alpha", vf)
-        v = vf
-
-    visS = ttk.Scale(master=visT, from_=0.1, to=1, orient=tk.HORIZONTAL, length=200, command=change_vis)
-    visS.place(x=30, y=80)
-
-
-# 设置壁纸
-def wallpaper():
-    global img_file, img
-    file = tkFile.askopenfilename(title="选择图片", filetypes=[("PNG", "*png"), ("JPG", "*jpg"), ("GIF", "*gif")])
-    if not file:
-        msgbox.showwarning(title="提示", message="您没有选择任何文件")
-        return
-    image = Image.open(file)
-    suffix = image.format
-
-    if image.size[0] / image.size[1] == 4 / 3:
-        image = image.resize((800, 600))
-        image.save(f'Image/wallpaper.{suffix}')
-        image = ImageTk.PhotoImage(image)
-        img = image
-        wallLb.config(image=img)
-        img_file = f'Image/wallpaper.{suffix}'
-    else:
-        def wall_auto(im, color):
-            global img_file, img
-            coefficient = min(800 / im.size[0], 600 / im.size[1])
-            im = im.resize((int(im.size[0] * coefficient), int(im.size[1] * coefficient)))
-            bg = Image.new(mode="RGBA", size=(800, 600), color=f"{color}c0")
-            position = (int((800 - im.size[0]) / 2), int((600 - im.size[1]) / 2))
-            bg.paste(im=im, box=position)
-            bg.save(f'Image/wallpaper.{suffix}')
-            img_file = f'Image/wallpaper.{suffix}'
-            bg = ImageTk.PhotoImage(bg)
-            img = bg
-            wallLb.config(image=img)
-
-        wallT = tk.Toplevel(master=window)
-        wallT.title("设置背景底色")
-        rSize = f"300x160+{int((sWidth - 200) / 2)}+{int((sHeight - 100) / 2)}"
-        wallT.geometry(rSize)
-        wallT.attributes("-alpha", v)
-        wallT.iconbitmap(r"Image/icon.ico")
-        wallT.resizable(False, False)
-        tk.Label(master=wallT, text="请输入一个十六进制的背景底色", font=("", 12)).place(x=40, y=10)
-        wallEn = ttk.Entry(master=wallT, font=("", 13))
-        wallEn.insert(0, "#FFFFFF")
-        wallEn.place(x=50, y=40, width=200, height=33)
-        tk.Button(master=wallT, text="完成", font=("", 13), command=lambda: wall_auto(image, wallEn.get())).place(x=130,
-                                                                                                                y=100)
-
-
-# 恢复默认界面
-def default():
-    global img_file, wTheme, v
-    v = 0.9
-    wTheme = "dark"
-    img_file = None
-    save_setting()
-    # 重启程序
-    execl(executable, executable, *argv)
-
-
-# 退出提示
-def bye():
-    rs = msgbox.askyesnocancel(title="提示", message="确定退出吗?\n点击“是”以退出，点击“否”以最小化窗口")
-    if rs is True:
-        save_setting()
-        window.quit()
-    elif rs is False:
-        window.iconify()
-
-
-# 设置下载路径
-def get_path():
-    pathT = tk.Toplevel(master=window)
-    pathT.title("路径设置")
-    rSize = f"400x300+{int((sWidth - 400) / 2)}+{int((sHeight - 300) / 2)}"
-    pathT.geometry(rSize)
-    pathT.attributes("-alpha", v)
-    pathT.iconbitmap(r"Image/icon.ico")
-    pathT.resizable(False, False)
-
-    tk.Label(master=pathT, text="音乐路径：", font=("", 12)).place(x=0, y=55)
-    tk.Label(master=pathT, text="歌词路径：", font=("", 12)).place(x=0, y=155)
-
-    pathTe = ttk.Entry(master=pathT, font=("", 12))
-    pathTe.insert(tk.INSERT, path.get())
-    pathTe.config(state=tk.DISABLED)
-    pathTe.place(x=80, y=50, width=300, height=45)
-
-    lyricT = ttk.Entry(master=pathT, font=("", 12))
-    lyricT.insert(tk.INSERT, lyric_path.get())
-    lyricT.config(state=tk.DISABLED)
-    lyricT.place(x=80, y=150, width=300, height=45)
-
-    pathS = ttk.Scrollbar(master=pathTe, command=pathTe.xview, orient=tk.HORIZONTAL)
-    lyricS = ttk.Scrollbar(master=lyricT, command=lyricT.xview, orient=tk.HORIZONTAL)
-    pathS.pack(side=tk.BOTTOM, fill=tk.X)
-    lyricS.pack(side=tk.BOTTOM, fill=tk.X)
-    pathTe.config(xscrollcommand=pathS.set)
-    lyricT.config(xscrollcommand=lyricS.set)
-
-    def change_path():
-        global path
-        file = tkFile.askdirectory(title="选择文件夹")
-        if not file:
-            msgbox.showwarning(title="提示", message="您没有选择任何文件夹", parent=pathT)
+    def change_theme(self, widget, theme):
+        if theme == "明亮":
+            self.theme = "明亮"
+            widget.setStyleSheet(load_stylesheet(qt_api="pyside6", palette=LightPalette()))
+        elif theme == "暗黑":
+            self.theme = "暗黑"
+            widget.setStyleSheet(load_stylesheet(qt_api="pyside6", palette=DarkPalette()))
         else:
-            path.set(file)
-            pathTe.config(state=tk.NORMAL)
-            pathTe.delete(0, tk.END)
-            pathTe.insert(tk.INSERT, path.get())
-            msgbox.showinfo(title="提示", message="更改成功", parent=pathT)
+            self.theme = "默认"
+            widget.setStyleSheet("")
+    
+    def vis(self, level):
+        self.v = level / 10
+        self.setWindowOpacity(self.v)
 
-    def change_lyric_path():
-        global lyric_path
-        file = tkFile.askdirectory(title="选择文件夹")
-        if not file:
-            msgbox.showwarning(title="提示", message="您没有选择任何文件夹", parent=pathT)
+    def change_bg(self):
+        image = QFileDialog.getOpenFileName(self, "选择图片", ".", "选择图片(*.jpg *.jpeg *.png *.JPG *.JPEG *.PNG)")[0]
+        image = Image.open(image)
+        suffix = image.format
+        image = image.resize((1040, 585))
+        image_file = f"Image/wallpaper.{suffix}"
+        image.save(image_file)
+        self.img_file = image_file
+        self.bgLabel.setPixmap(ImageQt.toqpixmap(image))
+
+    def resetStyle(self):
+        self.theme = "默认"
+        self.v = 0.9
+        self.img_file = None
+
+        self.change_theme(app, self.theme)
+        self.bgLabel.clear()
+        self.setWindowOpacity(self.v)
+
+        self.comboBox.setCurrentText("默认")
+        self.visSlider.setValue(self.v * 10)
+
+    def setMusicPath(self):
+        path = QFileDialog.getExistingDirectory(self, "选择文件夹", ".")
+        self.downloader.music_path = path
+        self.musicPathLineEdit.setText(self.downloader.music_path)
+
+    def setLyricPath(self):
+        path = QFileDialog.getExistingDirectory(self, "选择文件夹", ".")
+        self.downloader.lyric_path = path
+        self.lyricPathLineEdit.setText(self.downloader.lyric_path)
+
+    def setThreadNum(self):
+        self.downloader.thread_num = int(self.threadLineEdit.text())
+
+    def setUa(self, state):
+        if state == 2:
+            self.downloader.ua = "random"
         else:
-            lyric_path.set(file)
-            lyricT.config(state=tk.NORMAL)
-            lyricT.delete(0, tk.END)
-            lyricT.insert(tk.INSERT, lyric_path.get())
-            msgbox.showinfo(title="提示", message="更改成功", parent=pathT)
+            self.downloader.ua = choice(choice(list(choice(user_agent_json).values())))
 
-    ttk.Button(master=pathT, text="更改音乐保存路径", command=change_path).place(x=140, y=100)
-    ttk.Button(master=pathT, text="更改歌词保存路径", command=change_lyric_path).place(x=140, y=200)
+    def setSource(self, btn):
+        self.downloader.source = btn.text()
 
+    def setQuality(self, btn):
+        if btn.objectName() == "母带":
+            self.downloader.quality = 1
+        elif btn.objectName() == "标准":
+            self.downloader.quality = 2
+        elif btn.objectName() == "HQ":
+            self.downloader.quality = 3
+        elif btn.objectName() == "无损":
+            self.downloader.quality = 4
 
-# 打开音乐文件夹
-def music_file():
-    music_path = path.get()
-    if music_path == "./Download":
-        music_path = join(getcwd(), "Download")
-    startfile(music_path)
-
-
-def quick_search():
-    thread = Thread(target=search)
-    thread.start()
-
-
-# 回车搜索
-def en_search(self):
-    quick_search()
-
-songs = []
-def search():
-
-    global songs
-
-    if musicEn.get() == "":
-        msgbox.showwarning(title="提示", message="请输入内容!")
-        return
-
-    if origin.get() == "酷狗音乐":
-        master_type.config(state=tk.DISABLED)
-        no_losses.config(state=tk.DISABLED)
-        hq.config(state=tk.DISABLED)
-        standard.config(state=tk.ACTIVE)
-        downloadBtn.config(state=tk.NORMAL)
-        lyricCb.config(state=tk.DISABLED)
-        music_name = musicEn.get()
-        music_list, songs = kg_get_music(music_name)
-        info.set(music_list)
-
-    elif origin.get() == "QQ音乐VIP":
-        master_type.config(state=tk.NORMAL)
-        no_losses.config(state=tk.NORMAL)
-        hq.config(state=tk.NORMAL)
-        standard.config(state=tk.ACTIVE)
-        downloadBtn.config(state=tk.NORMAL)
-        lyricCb.config(state=tk.DISABLED)
-        music_name = musicEn.get()
-        music_list, songs = vip_qq_get_music(music_name)
-        info.set(music_list)
-
-    elif origin.get() == "QQ音乐":
-        master_type.config(state=tk.DISABLED)
-        no_losses.config(state=tk.DISABLED)
-        hq.config(state=tk.DISABLED)
-        standard.config(state=tk.ACTIVE)
-        downloadBtn.config(state=tk.NORMAL)
-        lyricCb.config(state=tk.NORMAL)
-        music_name = musicEn.get()
-        music_list, songs = qq_get_music(music_name)
-        info.set(music_list)
-
-    elif origin.get() == "咪咕音乐":
-        master_type.config(state=tk.DISABLED)
-        no_losses.config(state=tk.DISABLED)
-        hq.config(state=tk.DISABLED)
-        standard.config(state=tk.ACTIVE)
-        downloadBtn.config(state=tk.NORMAL)
-        lyricCb.config(state=tk.NORMAL)
-        music_name = musicEn.get()
-        music_list, songs = mg_get_music(music_name)
-        info.set(music_list)
-
-    elif origin.get() == "网易云音乐":
-        master_type.config(state=tk.DISABLED)
-        no_losses.config(state=tk.DISABLED)
-        hq.config(state=tk.DISABLED)
-        standard.config(state=tk.ACTIVE)
-        downloadBtn.config(state=tk.NORMAL)
-        lyricCb.config(state=tk.DISABLED)
-        music_name = musicEn.get()
-        music_list, songs = wy_get_music(music_name)
-        info.set(music_list)
-
-    else:
-        msgbox.showwarning(title="提示", message="您还未选择任何音源")
-        return
-
-
-down_task = tk.Variable()
-task = []
-down_task.set(task)
-
-
-# 下载音乐
-def download():
-    global down_task, task
-
-    try:
-        n = infoListB.curselection()[0]
-    except IndexError:
-        msgbox.showwarning(title="提示", message="您还未选择任何音乐")
-        return
-
-    music_name = songs[n]
-
-    def kg(dt: tk.Variable, t: list):
-        info_list = kg_download(music_name, n + 1, path.get())
-        t.remove(f"{origin.get()}:{music_name}")
-        dt.set(t)
-
-        if info_list is False:
-            msgbox.showwarning(title="下载", message="下载失败！")
+    def searchMusic(self):
+        if self.downloader.source == "":
+            QMessageBox.information(self, "无音源", "未选择音源！")
             return
-
-        song.set(info_list[0])
-        singer.set(info_list[1])
-        url.set(info_list[2])
-
-        songT.delete("1.0", tk.END)
-        singerT.delete("1.0", tk.END)
-        urlT.delete("1.0", tk.END)
-
-        songT.insert(tk.INSERT, song.get())
-        singerT.insert(tk.INSERT, singer.get())
-        urlT.insert(tk.INSERT, url.get())
-
-        msgbox.showinfo(title="酷狗音乐", message=f"下载完成\n{song.get()}")
-
-    def qq_vip(dt: tk.Variable, t: list, num: int):
-        br = quality.get()
-        if not isinstance(br, int):
-            br = 3
-        info_list = vip_qq_download(br=br, path=path.get(), songid=music_name, slice_num=num)
-        t.remove(f"{origin.get()}:{music_name}")
-        dt.set(t)
-
-        if info_list is False:
-            msgbox.showwarning(title="下载", message="下载失败！")
+        elif self.searchLineEdit.text() == "":
+            QMessageBox.information(self, "无信息", "请输入查找信息！")
             return
-        song.set(info_list[0])
-        singer.set(info_list[1])
-        url.set(info_list[2])
-
-        songT.delete("1.0", tk.END)
-        singerT.delete("1.0", tk.END)
-        urlT.delete("1.0", tk.END)
-
-        songT.insert(tk.INSERT, song.get())
-        singerT.insert(tk.INSERT, singer.get())
-        urlT.insert(tk.INSERT, url.get())
-
-        msgbox.showinfo(title="QQ音乐", message=f"音乐下载完成\n{song.get()}")
-
-    def qq(dt: tk.Variable, t: list):
-        if lyric.get() == "1":
-            info_list = qq_download(music_name, n + 1, path.get(), True, lyric_path.get())
+        
+        if self.downloader.source == "QQ音乐" or self.downloader.source == "MyFreeMP3":
+            self.qCheck_1.setEnabled(True)
+            self.qCheck_2.setEnabled(True)
+            self.qCheck_3.setEnabled(True)
+            self.qCheck_4.setEnabled(True)
         else:
-            info_list = qq_download(music_name, n + 1, path.get())
-        t.remove(f"{origin.get()}:{music_name}")
-        dt.set(t)
+            self.qCheck_1.setEnabled(False)
+            self.qCheck_2.setEnabled(False)
+            self.qCheck_3.setEnabled(False)
+            self.qCheck_4.setEnabled(False)
 
-        if info_list is False:
-            msgbox.showwarning(title="下载", message="下载失败！")
-            return
-        song.set(info_list[0])
-        singer.set(info_list[1])
-        url.set(info_list[2])
+        if self.downloader.source == "酷狗音乐" or self.downloader.source == "咪咕音乐" or self.downloader.source == "QQ音乐_2":
+            self.lyricDownBtn.setEnabled(True)
 
-        songT.delete("1.0", tk.END)
-        singerT.delete("1.0", tk.END)
-        urlT.delete("1.0", tk.END)
+        self.downloader.current_music = self.searchLineEdit.text()
 
-        songT.insert(tk.INSERT, song.get())
-        singerT.insert(tk.INSERT, singer.get())
-        urlT.insert(tk.INSERT, url.get())
+        self.downloader.search_music(name=self.downloader.current_music)
 
-        msgbox.showinfo(title="QQ音乐", message=f"音乐下载完成\n{song.get()}")
-
-    def mg(dt: tk.Variable, t: list):
-        if lyric.get() == "1":
-            info_list = mg_download(music_name, n + 1, path.get(), True, lyric_path.get())
-        else:
-            info_list = mg_download(music_name, n + 1, path.get())
-        t.remove(f"{origin.get()}:{music_name}")
-        dt.set(t)
-
-        if info_list is False:
-            msgbox.showwarning(title="下载", message="下载失败！")
-            return
-        song.set(info_list[0])
-        singer.set(info_list[1])
-
-        songT.delete("1.0", tk.END)
-        singerT.delete("1.0", tk.END)
-        urlT.delete("1.0", tk.END)
-
-        songT.insert(tk.INSERT, song.get())
-        singerT.insert(tk.INSERT, singer.get())
-
-        msgbox.showinfo(title="咪咕音乐", message=f"音乐下载完成\n{song.get()}")
-
-    def wy(dt: tk.Variable, t: list):
-        info_list = wy_download(music_name, n + 1, path.get())
-        t.remove(f"{origin.get()}:{music_name}")
-        dt.set(t)
-
-        if info_list is False:
-            msgbox.showwarning(title="下载", message="下载失败！")
-            return
-        song.set(info_list[0])
-        singer.set(info_list[1])
-        url.set(info_list[2])
-
-        songT.delete("1.0", tk.END)
-        singerT.delete("1.0", tk.END)
-        urlT.delete("1.0", tk.END)
-
-        songT.insert(tk.INSERT, song.get())
-        singerT.insert(tk.INSERT, singer.get())
-        urlT.insert(tk.INSERT, url.get())
-
-        msgbox.showinfo(title="网易云音乐", message=f"音乐下载完成\n{song.get()}")
-
-
-    if origin.get() == "酷狗音乐":
-        thread = Thread(target=kg, args=(down_task, task))
-        task.append(f"{origin.get()}:{music_name}")
-        down_task.set(task)
-        thread.start()
-
-    elif origin.get() == "QQ音乐VIP":
-        thread = Thread(target=qq_vip, args=(down_task, task, court_num.get()))
-        task.append(f"{origin.get()}:{music_name}")
-        down_task.set(task)
-        thread.start()
-
-    elif origin.get() == "QQ音乐":
-        thread = Thread(target=qq, args=(down_task, task))
-        task.append(f"{origin.get()}:{music_name}")
-        down_task.set(task)
-        thread.start()
-
-    elif origin.get() == "咪咕音乐":
-        thread = Thread(target=mg, args=(down_task, task))
-        task.append(f"{origin.get()}:{music_name}")
-        down_task.set(task)
-        thread.start()
-
-    elif origin.get() == "网易云音乐":
-        thread = Thread(target=wy, args=(down_task, task))
-        task.append(f"{origin.get()}:{music_name}")
-        down_task.set(task)
-        thread.start()
-
-    else:
-        msgbox.showwarning(title="提示", message="您还未选择任何音源")
-        return
-
-
-def downInfo():
-    downloadT = tk.Toplevel(master=window)
-    downloadT.title("下载列表")
-    rSize = f"520x390+{int((sWidth - 520) / 2)}+{int((sHeight - 390) / 2)}"
-    downloadT.geometry(rSize)
-    downloadT.attributes("-alpha", v)
-    downloadT.iconbitmap(r"Image/icon.ico")
-    downloadT.resizable(False, False)
-
-    ttk.Label(master=downloadT, text="下载中:", font=("", 13)).place(x=40, y=15, width=80, height=20)
-    downInfoBox = tk.Listbox(master=downloadT, relief=tk.GROOVE, listvariable=down_task, font=("", 13))
-    downInfoBox.place(x=40, y=45, width=450, height=320)
-
-    dYScroll = ttk.Scrollbar(master=downInfoBox, command=downInfoBox.yview)
-    dYScroll.pack(side=tk.RIGHT, fill=tk.Y)
-    dXScroll = ttk.Scrollbar(master=downInfoBox, command=downInfoBox.xview, orient=tk.HORIZONTAL)
-    dXScroll.pack(side=tk.BOTTOM, fill=tk.X)
-    downInfoBox.config(xscrollcommand=dXScroll.set, yscrollcommand=dYScroll.set)
-
-
-def concurrent_num():
-    msgbox.showinfo(title="提示", message="下载并发数在多线程并发下载时起效，请视机器性能填写，默认20线程")
-    courtT = tk.Toplevel(master=window)
-    courtT.title("设置下载并发数")
-    rSize = f"300x160+{int((sWidth - 200) / 2)}+{int((sHeight - 100) / 2)}"
-    courtT.geometry(rSize)
-    courtT.attributes("-alpha", v)
-    courtT.iconbitmap(r"Image/icon.ico")
-    courtT.resizable(False, False)
-    courtEn = ttk.Entry(master=courtT, font=("", 13))
-    courtEn.insert(0, court_num.get())
-    courtEn.place(x=100, y=30, width=100, height=33)
-
-    def check_court_num(num):
-        try:
-            num = int(num)
-        except ValueError:
-            msgbox.showwarning(title="提示", message="输入不合法", parent=courtT)
-            courtEn.delete(0, tk.END)
-            courtEn.insert(0, court_num.get())
-        else:
-            court_num.set(num)
-            msgbox.showinfo(title="提示", message="设置成功", parent=courtT)
-
-    ttk.Button(master=courtT, text="完成", command=lambda: check_court_num(courtEn.get())).place(x=105, y=90)
-
-
-def songlist():
-    songlistT = tk.Toplevel(master=window)
-    songlistT.title("QQ音乐:导入歌单")
-    rSize = f"720x540+{int((sWidth - 720) / 2)}+{int((sHeight - 540) / 2)}"
-    songlistT.geometry(rSize)
-    songlistT.attributes("-alpha", v)
-    songlistT.iconbitmap(r"Image/icon.ico")
-    songlistT.resizable(False, False)
-
-    # 壁纸
-    songlistWall = ttk.Label(master=songlistT)
-    songlistWall.pack()
-    if img_file is not None:
-        im = Image.open(img_file)
-        im = im.resize((720, 540))
-        im = ImageTk.PhotoImage(im)
-        songlistWall.config(image=im)
-
-    songlist_info = tk.Variable()
-    songlist_info.set([])
-
-    songids = []
-
-    def ipt_songlist():
-        nonlocal songids
-        song_info = import_songlist(songlistEn.get())
-        if song_info is False:
-            msgbox.showwarning(title="导入失败", message="请输入歌单链接或歌单id", parent=songlistT)
-            return
-
-        msgbox.showinfo(title="导入成功", message=song_info[0], parent=songlistT)
-        songlist_info.set(song_info[1])
-        songids = song_info[2]
-
-    def down():
-        try:
-            n = songListB.curselection()[0]
-        except IndexError:
-            msgbox.showwarning(title="提示", message="您还未选择任何音乐")
-            return
-
-        br = quality.get()
-        if not isinstance(br, int):
-            br = 3
-
-        def qq_down():
-            global down_task, task
-            name = f"QQ音乐VIP:{songListB.get(n)}"
-            task.append(name)
-            down_task.set(task)
-            song_info = vip_qq_download(br=br, path=path.get(), songid=songids[n])
-            if song_info is False:
-                msgbox.showwarning(title="下载", message="下载失败！", parent=songlistT)
+    def download(self, mode):
+        if mode == Mode.MUSIC:
+            music_items = self.musicListWidget.selectedItems()
+            if not music_items:
+                QMessageBox.warning(self, "提示", "您未选择任何音乐")
                 return
-            music_info = f"{song_info[0]}-{song_info[1]}"
-            task.remove(name)
-            down_task.set(task)
-            msgbox.showinfo(title="QQ音乐", message=f"音乐下载完成\n{music_info}", parent=songlistT)
 
-        thread = Thread(target=qq_down)
-        thread.start()
+            music_index = []
+            task_id = []
+            for item in music_items:
+                index = self.musicListWidget.row(item)
+                self.taskList.addItem(item.text())
+                task_id.append(item.text())
+                music_index.append(index)
+
+            for o, n in enumerate(music_index):
+                self.downloader.download_music(n, task_id[o])
+        
+        elif mode == Mode.LYRIC:
+            music_index = []
+            task_id = []
+            for item in music_items:
+                index = self.musicListWidget.indexFromItem(item).row()
+                self.taskList.addItem(item.text())
+                task_id.append(f"{item.text()}")
+                music_index.append(index)
+
+            if self.downloader.source == "酷狗音乐":
+                for o, n in enumerate(music_index):
+                    self.downloader.download_lyric(task_id[o], n)
+            else:
+                for o, n in enumerate(music_index):
+                    self.downloader.download_music(n, task_id[o], Mode.LYRIC)
+        
+        elif mode == Mode.IMPORT:
+            music_items = self.musicImportListWidget.selectedItems()
+            if not music_items:
+                QMessageBox.warning(self, "提示", "您未选择任何音乐")
+                return
+            
+            music_index = []
+            task_id = []
+            for item in music_items:
+                index = self.musicImportListWidget.row(item)
+                self.taskList.addItem(item.text())
+                task_id.append(item.text())
+                music_index.append(index)
+
+            for o, n in enumerate(music_index):
+                self.downloader.download_music(n, task_id[o])
+            
+    def importSongList(self):
+        info = self.searchLineEdit.text()
+        if  info == "":
+            QMessageBox.information(self, "无信息", "请输入查找信息！")
+            return
+        
+        self.downloader.source = "QQ音乐"
+        self.downloader.import_music(info)
 
 
-    songlistEn = ttk.Entry(master=songlistT, font=("", 13))
-    songlistEn.insert(0, "请输入歌单链接或歌单id")
-    songlistEn.place(x=140, y=30, width=440, height=33)
+    def update(self):
+        self.updateCheckBtn.setEnabled(False)
+        version, info = update(self.downloader.ua)
 
-    tk.Button(master=songlistT, text="导入", font=("", 13), command=ipt_songlist).place(x=500, y=80, width=80, height=30)
-    tk.Button(master=songlistT, text="下\n载\n选\n中", font=("", 13), command=down).place(x=540, y=140, width=40, height=100)
+        if version == __version__:
+            QMessageBox.information(self, "检查更新", f"当前已是最新版本\n{__version__}")
+            return
+        
+        self.latest_version = version
+        QMessageBox.information(self, "检查更新", f"有可用的更新\n{version}")
+        self.latestInfo.setMarkdown(info)
+        self.mainStacked.setCurrentIndex(3)
+        self.updateCheckBtn.setEnabled(True)
 
-    ttk.Radiobutton(master=songlistT, text="母带", variable=quality, value=1).place(x=140, y=75)
-    ttk.Radiobutton(master=songlistT, text="无损", variable=quality, value=2).place(x=220, y=75)
-    ttk.Radiobutton(master=songlistT, text="HQ", variable=quality, value=3).place(x=300, y=75)
-    ttk.Radiobutton(master=songlistT, text="标准", variable=quality, value=4).place(x=380, y=75)
+    def updating(self):
+        self.updateLabel.setText("请稍后......")
+        self.updateCheckBtn.setEnabled(False)
+        self.updateBtn.setEnabled(False)
+        self.downloader.update(self.latest_version)
 
-    songListB = tk.Listbox(master=songlistT, relief=tk.GROOVE, listvariable=songlist_info, font=("", 13))
-    songListB.place(x=140, y=140, width=380, height=370)
+    def bind(self):
+        # 搜索按钮绑定
+        self.searchBtn.clicked.connect(self.searchMusic)
+        self.searchLineEdit.returnPressed.connect(self.searchMusic)
+        # 导入歌单菜单按钮绑定
+        self.imp_menu.triggered.connect(self.importSongList)
+        # 音源按钮组绑定
+        self.source_group.buttonClicked.connect(self.setSource)
+        # 菜单按钮绑定
+        self.taskBtn.clicked.connect(lambda: self.menuStacked.setCurrentIndex(0))
+        self.styleBtn.clicked.connect(lambda: self.menuStacked.setCurrentIndex(1))
+        self.fileBtn.clicked.connect(lambda: self.menuStacked.setCurrentIndex(2))
+        self.downloadBtn.clicked.connect(lambda: self.menuStacked.setCurrentIndex(3))
+        self.aboutBtn.clicked.connect(lambda: self.menuStacked.setCurrentIndex(4))
+        # 更新按钮绑定
+        self.updateCheckBtn.clicked.connect(self.update)
+        self.updateBtn.clicked.connect(self.updating)
+        # 主题下拉框绑定
+        self.comboBox.currentIndexChanged.connect(lambda: self.change_theme(app, self.comboBox.currentText()))
+        # 选择背景按钮绑定
+        self.bgBtn.clicked.connect(self.change_bg)
+        # 窗口透明度滑条绑定
+        self.visSlider.valueChanged.connect(self.vis)
+        # 恢复默认样式按钮绑定
+        self.resetBtn.clicked.connect(self.resetStyle)
+        # 打开音乐保存目录按钮绑定
+        self.musicOpenBtn.clicked.connect(lambda: os.startfile(self.downloader.music_path))
+        # 打开歌词保存目录按钮绑定
+        self.lyricOpenBtn.clicked.connect(lambda: os.startfile(self.downloader.lyric_path))
+        # 音乐和歌词保存目录选择按钮绑定
+        self.musicPathBtn.clicked.connect(self.setMusicPath)
+        self.lyricPathBtn.clicked.connect(self.setLyricPath)
+        # 线程数设置按钮绑定
+        self.threadBtn.clicked.connect(self.setThreadNum)
+        # 随机UACheckBox绑定
+        self.randomUaCheck.stateChanged.connect(self.setUa)
+        # 下载按钮绑定
+        self.importMusicDownBtn.clicked.connect(lambda: self.download(Mode.IMPORT))
+        self.musicDownBtn.clicked.connect(lambda: self.download(Mode.MUSIC))
+        self.lyricDownBtn.clicked.connect(lambda: self.download(Mode.LYRIC))
+        # 音乐列表清空按钮绑定
+        self.importMusicClearBtn.clicked.connect(self.musicImportListWidget.clear)
+        self.musicResClearBtn.clicked.connect(self.musicListWidget.clear)
+        # 音质按钮组绑定
+        self.quality_group.buttonClicked.connect(self.setQuality)
+        # 其他控件绑定
+        self.sponserBtn.clicked.connect(self.sponsorshipWindowShow)
 
-    ttk.Label(master=songlistT, text="歌单:", font=("", 13)).place(x=140, y=110)
+    def closeEvent(self, event):
+        
+        if self.taskList.count():
+            res = QMessageBox.question(self, "退出", "当前还有任务正在进行，确定要退出吗？", QMessageBox.Yes | QMessageBox.No)
+        else:
+            res = QMessageBox.question(self, "退出", "确定要退出吗？", QMessageBox.Yes | QMessageBox.No)
 
-    sYScroll = ttk.Scrollbar(master=songListB, command=songListB.yview)
-    sYScroll.pack(side=tk.RIGHT, fill=tk.Y)
-    sXScroll = ttk.Scrollbar(master=songListB, command=songListB.xview, orient=tk.HORIZONTAL)
-    sXScroll.pack(side=tk.BOTTOM, fill=tk.X)
-    songListB.config(xscrollcommand=sXScroll.set, yscrollcommand=sYScroll.set)
+        if res == QMessageBox.Yes:
+            with open("config.json", "w", encoding="utf-8") as f:
+                config = {
+                    "theme": self.theme,
+                    "v": self.v,
+                    "music_path": self.downloader.music_path,
+                    "lyric_path": self.downloader.lyric_path,
+                    "img_file": self.img_file,
+                    "thread_num": self.downloader.thread_num,
+                    "ua": self.downloader.ua
+                }
+                dump(config, f)
+            event.accept()
+        else:
+            event.ignore()
 
 
-# 顶级菜单栏
-menu = tk.Menu(master=window)
-optionMenu = tk.Menu(master=menu, tearoff=False)
-aboutMenu = tk.Menu(master=menu, tearoff=False)
-fileMenu = tk.Menu(master=menu, tearoff=False)
-downloadMenu = tk.Menu(master=menu, tearoff=False)
-menu.add_cascade(label="设置", menu=optionMenu)
-menu.add_cascade(label="文件", menu=fileMenu)
-menu.add_cascade(label="下载", menu=downloadMenu)
-menu.add_cascade(label="关于", menu=aboutMenu)
+if __name__ == "__main__":
+    app = QApplication()
+    
+    w = MainWindow()
+    w.show()
 
-# 关于
-aboutMenu.add_command(
-    label="说明", command=lambda: msgbox.showinfo(title="说明", message="作者:ZYKsslm\nQQ:3119964735\n该软件仅供学习交流使用!"))
-aboutMenu.add_command(label="版本", command=lambda: msgbox.showinfo(
-    title="版本", message="ver 0.1.9-GUI\n需要兼容python>=3.8"))
-
-# 设置:更换主题
-themeMenu = tk.Menu(master=optionMenu, tearoff=False)
-optionMenu.add_cascade(label="更换主题", menu=themeMenu)
-theme = tk.Menu(master=themeMenu, tearoff=False)
-themeMenu.add_cascade(label="Azure-ttk-theme", menu=theme)
-theme.add_command(label="light", command=light_theme)
-theme.add_command(label="dark(默认)", command=dark_theme)
-
-# 更换背景
-bgMenu = tk.Menu(master=optionMenu, tearoff=False)
-optionMenu.add_cascade(label="更换背景", menu=bgMenu)
-wallMenu = tk.Menu(master=bgMenu, tearoff=False)
-bgMenu.add_command(label="选择背景图片（建议尺寸4比3）", command=wallpaper)
-bgMenu.add_command(label="恢复默认", command=default)
-
-# 调节透明度
-optionMenu.add_command(label="调节透明度", command=vis)
-
-optionMenu.add_separator()
-
-# 设置:退出
-optionMenu.add_command(label="退出", command=bye)
-window.config(menu=menu)
-
-# 文件
-fileMenu.add_command(label="路径设置", command=get_path)
-fileMenu.add_command(label="打开音乐文件夹", command=music_file)
-
-# 下载
-downloadMenu.add_command(label="查看下载任务", command=downInfo)
-downloadMenu.add_command(label="设置下载并发数", command=concurrent_num)
-
-songlistMenu = tk.Menu(master=downloadMenu, tearoff=False)
-downloadMenu.add_cascade(label="导入歌单", menu=songlistMenu)
-songlistMenu.add_command(label="QQ音乐", command=songlist)
-
-tipLb = ttk.Label(master=window, text="请输入歌名:", font=("", 13))
-tipLb.place(x=50, y=45)
-
-musicEn = ttk.Entry(master=window, font=("", 13))
-musicEn.place(x=170, y=40, width=450, height=33)
-musicEn.bind("<Return>", en_search)
-
-tk.Button(master=window, text="搜索", font=("", 13), command=quick_search).place(x=645, y=40, width=80, height=30)
-
-origin = tk.StringVar()
-origin.set("音源:未选择")
-ttk.Radiobutton(master=window, text="酷狗音乐", variable=origin, value="酷狗音乐",
-                command=lambda: modeLb.configure(background="#1E90FF", foreground="white")).place(x=50, y=88)
-ttk.Radiobutton(master=window, text="QQ音乐VIP", variable=origin, value="QQ音乐VIP",
-                command=lambda: modeLb.configure(background="gold", foreground="#3CB371")).place(x=170, y=88)
-ttk.Radiobutton(master=window, text="QQ音乐", variable=origin, value="QQ音乐",
-                command=lambda: modeLb.configure(background="gold", foreground="#3CB371")).place(x=290, y=88)
-ttk.Radiobutton(master=window, text="网易云音乐", variable=origin, value="网易云音乐",
-                command=lambda: modeLb.configure(background="red", foreground="white")).place(x=410, y=88)
-ttk.Radiobutton(master=window, text="咪咕音乐", variable=origin, value="咪咕音乐",
-                command=lambda: modeLb.configure(background="#FF1493", foreground="white")).place(x=530, y=88)
-
-ttk.Label(master=window, text="搜索结果:", font=("", 13)).place(x=50, y=135)
-info = tk.Variable()
-lyric = tk.Variable()
-lyricCb = ttk.Checkbutton(master=window, text="同时下载歌词", variable=lyric, state=tk.DISABLED)
-lyricCb.place(x=320, y=140)
-infoListB = tk.Listbox(master=window, relief=tk.GROOVE, listvariable=info, font=("", 13))
-infoListB.place(x=50, y=177, width=380, height=335)
-
-yScroll = ttk.Scrollbar(master=infoListB, command=infoListB.yview)
-yScroll.pack(side=tk.RIGHT, fill=tk.Y)
-xScroll = ttk.Scrollbar(master=infoListB, command=infoListB.xview, orient=tk.HORIZONTAL)
-xScroll.pack(side=tk.BOTTOM, fill=tk.X)
-infoListB.config(xscrollcommand=xScroll.set, yscrollcommand=yScroll.set)
-
-ttk.Label(master=window, text="信息:", font=("", 13)).place(x=510, y=135)
-ttk.Label(master=window, relief=tk.SUNKEN).place(x=510, y=177, width=250, height=335)
-modeLb = ttk.Label(master=window, textvariable=origin, font=("", 13))
-modeLb.place(x=520, y=190)
-
-song = tk.StringVar()
-song.set("无歌名")
-songT = tk.Text(master=window, font=("", 13))
-songT.place(x=520, y=230, width=230, height=50)
-songT.insert(tk.INSERT, song.get())
-
-singer = tk.StringVar()
-singer.set("无歌手")
-singerT = tk.Text(master=window, font=("", 13))
-singerT.place(x=520, y=315, width=230, height=60)
-singerT.insert(tk.INSERT, singer.get())
-
-url = tk.StringVar()
-url.set("无链接")
-urlT = tk.Text(master=window, font=("", 13))
-urlT.place(x=520, y=410, width=230, height=65)
-urlT.insert(tk.INSERT, url.get())
-
-downloadBtn = tk.Button(master=window, state=tk.DISABLED, text="下\n载\n音\n乐", relief=tk.GROOVE, font=("", 13),
-                        command=download)
-downloadBtn.place(x=450, y=177, width=40, height=100)
-quality = tk.Variable()
-master_type = ttk.Radiobutton(master=window, state=tk.DISABLED, text="母带", variable=quality, value=1)
-master_type.place(x=440, y=300)
-no_losses = ttk.Radiobutton(master=window, state=tk.DISABLED, text="无损", variable=quality, value=2)
-no_losses.place(x=440, y=350)
-hq = ttk.Radiobutton(master=window, state=tk.DISABLED, text="HQ", variable=quality, value=3)
-hq.place(x=440, y=400)
-standard = ttk.Radiobutton(master=window, state=tk.DISABLED, text="标准", variable=quality, value=4)
-standard.place(x=440, y=450)
-
-window.protocol("WM_DELETE_WINDOW", bye)
-window.mainloop()
+    sys.exit(app.exec())
