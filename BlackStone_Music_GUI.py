@@ -1,34 +1,33 @@
 import sys
 import os
-from PIL import Image, ImageQt
 
 from PySide6.QtWidgets import *
-from qdarkstyle.dark.palette import DarkPalette
-from qdarkstyle.light.palette import LightPalette
-from qdarkstyle import load_stylesheet
-from ujson import dump
+from PySide6.QtCore import QThread
+from PySide6.QtGui import QPixmap, QColor
+from qfluentwidgets import SplitFluentWindow, setTheme, Theme, setThemeColor, FluentIcon, ColorPickerButton, NavigationItemPosition, Dialog, StateToolTip
+from ujson import dump, load
 
-from Ui_mainWidget import Ui_mainWidget
-from sponseorshipWindow import *
-from work import *
+from subWindow.searchWidget import SearchWindow
+from subWindow.importWidget import ImportWindow
+from subWindow.taskWidget import TaskWindow
+from subWindow.settingWidget import SettingWindow
+from subWindow.aboutWidget import AboutWindow
+from source.work import Downloader, check_network
 
 
-__version__ = "v0.2.0"
+__version__ = "v0.2.1"
 
 
-class MainWindow(QWidget, Ui_mainWidget):
+class Window(SplitFluentWindow):
     def __init__(self):
         super().__init__()
         self.config()
-        self.setupUi(self)
+        self.setupUi()
         self.bind()
-
+        
     def config(self):
-        with open("config.json", "r", encoding="utf-8") as f:
+        with open("source/config.json", "r", encoding="utf-8") as f:
             configs = load(f)
-        self.theme = configs["theme"]
-        self.v = configs["v"]
-        self.img_file = configs["img_file"]
 
         music_path = configs["music_path"]
         lyric_path = configs["lyric_path"]
@@ -37,317 +36,453 @@ class MainWindow(QWidget, Ui_mainWidget):
             music_path = os.path.join(os.getcwd(), "Download")
         if lyric_path == "./Download":
             lyric_path = os.path.join(os.getcwd(), "Download")
-
-        # 定义初始下载器对象
-        self.downloader = Downloader(self, configs["ua"], configs["thread_num"], music_path, lyric_path)
-
-    def setupUi(self, mainWidget):
-        super().setupUi(mainWidget)
-        self.setFixedSize(1040, 585)
-        self.setWindowOpacity(self.v)
-        self.change_theme(app, self.theme)
-        if self.img_file is not None:
-            self.bgLabel.setPixmap(QPixmap(self.img_file))
-
-        self.verLabel.setText(__version__)
-        self.impMenu = QMenu(self)
-        self.imp_menu = self.impMenu.addAction("QQ音乐")
-        self.impBtn.setMenu(self.impMenu)
-        self.source_group = QButtonGroup(self)
-        self.source_group.addButton(self.source_1, 1)
-        self.source_group.addButton(self.source_2, 2)
-        self.source_group.addButton(self.source_3, 3)
-        self.source_group.addButton(self.source_4, 4)
-        self.source_group.addButton(self.source_5, 5)
-        self.source_group.addButton(self.source_6, 6)
-        self.musicPathLineEdit.setText(self.downloader.music_path)
-        self.lyricPathLineEdit.setText(self.downloader.lyric_path)
-        self.comboBox.addItems(["默认", "明亮", "暗黑"])
-        self.comboBox.setCurrentText(self.theme)
-        self.visSlider.setMinimum(1)
-        self.visSlider.setMaximum(10)
-        self.visSlider.setSingleStep(1)
-        self.visSlider.setValue(7)
-        self.threadLineEdit.setText(str(self.downloader.thread_num))
-        self.quality_group = QButtonGroup()
-        self.quality_group.addButton(self.qCheck_1, 1)
-        self.quality_group.addButton(self.qCheck_2, 2)
-        self.quality_group.addButton(self.qCheck_3, 3)
-        self.quality_group.addButton(self.qCheck_4, 4)
-        self.qCheck_1.setEnabled(False)
-        self.qCheck_2.setEnabled(False)
-        self.qCheck_3.setEnabled(False)
-        self.qCheck_4.setEnabled(False)
-        self.imp_quality_group = QButtonGroup()
-        self.imp_quality_group.addButton(self.qCheck_5, 1)
-        self.imp_quality_group.addButton(self.qCheck_6, 2)
-        self.imp_quality_group.addButton(self.qCheck_7, 3)
-        self.imp_quality_group.addButton(self.qCheck_8, 4)
-        # self.qCheck_5.setEnabled(False)
-        # self.qCheck_6.setEnabled(False)
-        # self.qCheck_7.setEnabled(False)
-        # self.qCheck_8.setEnabled(False)
-        self.lyricDownBtn.setEnabled(False)
-        self.importLyricDownBtn.setEnabled(False)
-        # TODO
-        self.source_6.setEnabled(False)
-
-    def sponsorshipWindowShow(self):
-        self.sponsorshipWindow = sponsorshipWindow()
-        self.sponsorshipWindow.show()
-
-    def change_theme(self, widget, theme):
+            
+        configs["music_path"] = music_path
+        configs["lyric_path"] = lyric_path
+        
+        theme = configs["theme"]
         if theme == "明亮":
-            self.theme = "明亮"
-            widget.setStyleSheet(load_stylesheet(qt_api="pyside6", palette=LightPalette()))
+            setTheme(Theme.LIGHT)
         elif theme == "暗黑":
-            self.theme = "暗黑"
-            widget.setStyleSheet(load_stylesheet(qt_api="pyside6", palette=DarkPalette()))
+            setTheme(Theme.DARK)
         else:
-            self.theme = "默认"
-            widget.setStyleSheet("")
-    
-    def vis(self, level):
-        self.v = level / 10
-        self.setWindowOpacity(self.v)
+            setTheme(Theme.AUTO)
+            
+        self.tasks = {}
+        self.source = ""
+        self.import_source = ""
+        self.configs = configs
+        
+        if self.configs["checkNetwork"]:
+            res = check_network(self.configs["ua"])
+            if not res:
+                Dialog("网络连接失败", "网络连接异常，请检查网络连接！", self).show()
 
-    def change_bg(self):
+
+    def setupUi(self):
+        self.setFixedSize(1040, 585)
+        self.setWindowIcon(QPixmap("source/Image/Icon.ico"))
+        self.setWindowTitle("BlackStone_Music_GUI")
+        self.setWindowOpacity(self.configs["v"])
+        setThemeColor(QColor(self.configs["theme_color"]))
+        
+        # 子界面
+        self.searchWindow = SearchWindow()
+        self.importWindow = ImportWindow()
+        self.taskWindow = TaskWindow()
+        self.settingWindow = SettingWindow()
+        self.aboutWindow = AboutWindow()
+        
+        img_file = self.configs["img_file"]
+        
+        if img_file is not None:
+            self.settingWindow.bgViewLabel.setPixmap(QPixmap(img_file).scaled(160, 90))
+            self.searchWindow.bgLabel.setPixmap(QPixmap(img_file).scaled(991, 585))
+            self.importWindow.bgLabel.setPixmap(QPixmap(img_file).scaled(991, 585))
+            self.taskWindow.bgLabel.setPixmap(QPixmap(img_file).scaled(991, 585))
+            self.settingWindow.bgLabel.setPixmap(QPixmap(img_file).scaled(991, 585))
+            self.aboutWindow.bgLabel.setPixmap(QPixmap(img_file).scaled(991, 585))
+        
+        self.settingWindow.threadNumEdit.setText(str(self.configs["thread_num"]))
+        self.settingWindow.colorBtn = ColorPickerButton(QColor(self.configs["theme_color"]), "选择主题颜色", self.settingWindow.colorFrame, True)
+        self.settingWindow.colorBtn.move(478, 2)
+        if self.configs["ua"] == "random":
+            self.settingWindow.randomUaBtn.setChecked(True)
+            self.settingWindow.selfUaEdit.setEnabled(False)
+        else:
+            self.settingWindow.randomUaBtn.setChecked(False)
+            self.settingWindow.selfUaEdit.setText(self.configs["ua"])
+        if self.configs["downloadTip"] == True:
+            self.settingWindow.downloadTipBtn.setChecked(True)
+        else:
+            self.settingWindow.downloadTipBtn.setChecked(False)
+        if self.configs["checkNetwork"]:
+            self.settingWindow.checkNetworkBtn.setChecked(True)
+        else:
+            self.settingWindow.checkNetworkBtn.setChecked(False)
+        self.settingWindow.themeBox.setCurrentText(self.configs["theme"])
+        self.settingWindow.opacitySlider.setValue(self.configs["v"]*10)
+        self.settingWindow.musicPathEdit.setText(self.configs["music_path"])
+        self.settingWindow.lyricPathEdit.setText(self.configs["lyric_path"])
+        self.aboutWindow.verLabel.setText(__version__)
+        
+        self.addSubInterface(self.searchWindow, FluentIcon.SEARCH, "搜索音乐")
+        self.addSubInterface(self.importWindow, FluentIcon.LIBRARY, "导入歌单")
+        self.addSubInterface(self.taskWindow, FluentIcon.TAG, "下载任务")
+        self.addSubInterface(self.settingWindow, FluentIcon.SETTING, "设置", NavigationItemPosition.BOTTOM)
+        self.addSubInterface(self.aboutWindow, FluentIcon.INFO, "关于", NavigationItemPosition.BOTTOM)
+        
+    def bind(self):
+        self.aboutWindow.updateBtn.clicked.connect(self.check_update)
+        self.searchWindow.searchLineEdit.searchSignal.connect(self.search)
+        self.searchWindow.sourceBox.currentTextChanged.connect(self.setSource)
+        self.importWindow.sourceBox.currentTextChanged.connect(self.setImportSource)
+        self.searchWindow.musicTable.setMusicFunc(self.download_music)
+        self.searchWindow.musicTable.setLyricFunc(self.download_lyric)
+        self.settingWindow.opacitySlider.valueChanged.connect(self.setOpacity)
+        self.settingWindow.bgBtn.clicked.connect(self.setBg)
+        self.settingWindow.resetBtn.clicked.connect(self.resetStyle)
+        self.settingWindow.themeBox.currentTextChanged.connect(lambda: self.resetTheme(self.settingWindow.themeBox.currentText()))
+        self.settingWindow.openMusicPathBtn.clicked.connect(lambda: os.startfile(self.configs["music_path"]))
+        self.settingWindow.openLyricPathBtn.clicked.connect(lambda: os.startfile(self.configs["lyric_path"]))
+        self.settingWindow.threadNumEdit.textChanged.connect(self.setThreadNum)
+        self.settingWindow.selfUaEdit.textChanged.connect(self.setUa)
+        self.settingWindow.randomUaBtn.checkedChanged.connect(self.setUaState)
+        self.settingWindow.downloadTipBtn.checkedChanged.connect(self.setDownloadTip)
+        self.settingWindow.colorBtn.colorChanged.connect(self.resetThemeColor)
+        self.settingWindow.musicPathBtn.clicked.connect(self.setMusicPath)
+        self.settingWindow.lyricPathBtn.clicked.connect(self.setLyricPath)
+        self.settingWindow.checkNetworkBtn.checkedChanged.connect(self.setCheckNetworkState)
+        self.importWindow.importLineEdit.searchSignal.connect(self.import_music)
+        self.importWindow.musicTable.setMusicFunc(self.download_music)
+        
+    def resetTheme(self, theme):
+        if theme == "明亮":
+            setTheme(Theme.LIGHT)
+        elif theme == "暗黑":
+            setTheme(Theme.DARK)
+        else:
+            setTheme(Theme.AUTO)
+        self.configs["theme"] = theme
+        
+    def resetThemeColor(self, color: QColor):
+        setThemeColor(color)
+        self.configs["theme_color"] = color.name()
+        
+    def setBg(self):
         image = QFileDialog.getOpenFileName(self, "选择图片", ".", "选择图片(*.jpg *.jpeg *.png *.JPG *.JPEG *.PNG)")[0]
-        image = Image.open(image)
-        suffix = image.format
-        image = image.resize((1040, 585))
-        image_file = f"Image/wallpaper.{suffix}"
-        image.save(image_file)
-        self.img_file = image_file
-        self.bgLabel.setPixmap(ImageQt.toqpixmap(image))
-
+        if image == "":
+            Dialog("选择图片", "您没有选择任何图片！", self).show()
+        else:
+            self.configs["img_file"] = image
+            self.settingWindow.bgViewLabel.setPixmap(QPixmap(image).scaled(160, 90))
+            self.searchWindow.bgLabel.setPixmap(QPixmap(image).scaled(991, 585))
+            self.importWindow.bgLabel.setPixmap(QPixmap(image).scaled(991, 585))
+            self.taskWindow.bgLabel.setPixmap(QPixmap(image).scaled(991, 585))
+            self.settingWindow.bgLabel.setPixmap(QPixmap(image).scaled(991, 585))
+            self.aboutWindow.bgLabel.setPixmap(QPixmap(image).scaled(991, 585))
+            
     def resetStyle(self):
-        self.theme = "默认"
-        self.v = 0.9
-        self.img_file = None
+        self.configs["theme"] = "明亮"
+        self.configs["v"] = 0.9
+        self.configs["img_file"] = None
+        self.configs["theme_color"] = "#009faa"
 
-        self.change_theme(app, self.theme)
-        self.bgLabel.clear()
-        self.setWindowOpacity(self.v)
+        self.resetTheme("明亮")
+        setThemeColor(QColor("#009faa"))
+        self.settingWindow.bgViewLabel.clear()
+        self.searchWindow.bgLabel.clear()
+        self.importWindow.bgLabel.clear()
+        self.taskWindow.bgLabel.clear()
+        self.settingWindow.bgLabel.clear()
+        self.aboutWindow.bgLabel.clear()
+        self.setOpacity(9)
 
-        self.comboBox.setCurrentText("默认")
-        self.visSlider.setValue(self.v * 10)
-
+        self.settingWindow.themeBox.setCurrentText(self.configs["theme"])
+        self.settingWindow.opacitySlider.setValue(self.configs["v"] * 10)
+            
+    def setSource(self):
+        self.source = self.searchWindow.sourceBox.currentText()
+        
+    def setImportSource(self):
+        self.import_source = self.importWindow.sourceBox.currentText()
+        
     def setMusicPath(self):
         path = QFileDialog.getExistingDirectory(self, "选择文件夹", ".")
-        self.downloader.music_path = path
-        self.musicPathLineEdit.setText(self.downloader.music_path)
-
+        if path != "":
+            self.configs["music_path"] = path
+            self.settingWindow.musicPathEdit.setText(path)
+    
     def setLyricPath(self):
         path = QFileDialog.getExistingDirectory(self, "选择文件夹", ".")
-        self.downloader.lyric_path = path
-        self.lyricPathLineEdit.setText(self.downloader.lyric_path)
-
-    def setThreadNum(self):
-        self.downloader.thread_num = int(self.threadLineEdit.text())
-
-    def setUa(self, state):
-        if state == 2:
-            self.downloader.ua = "random"
-        else:
-            self.downloader.ua = choice(choice(list(choice(user_agent_json).values())))
-
-    def setSource(self, btn):
-        self.downloader.source = btn.text()
-
-    def setQuality(self, btn):
-        if btn.objectName() == "母带":
-            self.downloader.quality = 1
-        elif btn.objectName() == "标准":
-            self.downloader.quality = 2
-        elif btn.objectName() == "HQ":
-            self.downloader.quality = 3
-        elif btn.objectName() == "无损":
-            self.downloader.quality = 4
-
-    def searchMusic(self):
-        if self.downloader.source == "":
-            QMessageBox.information(self, "无音源", "未选择音源！")
-            return
-        elif self.searchLineEdit.text() == "":
-            QMessageBox.information(self, "无信息", "请输入查找信息！")
-            return
-        
-        if self.downloader.source == "QQ音乐" or self.downloader.source == "MyFreeMP3":
-            self.qCheck_1.setEnabled(True)
-            self.qCheck_2.setEnabled(True)
-            self.qCheck_3.setEnabled(True)
-            self.qCheck_4.setEnabled(True)
-        else:
-            self.qCheck_1.setEnabled(False)
-            self.qCheck_2.setEnabled(False)
-            self.qCheck_3.setEnabled(False)
-            self.qCheck_4.setEnabled(False)
-
-        if self.downloader.source == "酷狗音乐" or self.downloader.source == "咪咕音乐" or self.downloader.source == "QQ音乐_2":
-            self.lyricDownBtn.setEnabled(True)
-
-        self.downloader.current_music = self.searchLineEdit.text()
-
-        self.downloader.search_music(name=self.downloader.current_music)
-
-    def download(self, mode):
-        if mode == Mode.MUSIC:
-            music_items = self.musicListWidget.selectedItems()
-            if not music_items:
-                QMessageBox.warning(self, "提示", "您未选择任何音乐")
-                return
-
-            music_index = []
-            task_id = []
-            for item in music_items:
-                index = self.musicListWidget.row(item)
-                self.taskList.addItem(item.text())
-                task_id.append(item.text())
-                music_index.append(index)
-
-            for o, n in enumerate(music_index):
-                self.downloader.download_music(n, task_id[o])
-        
-        elif mode == Mode.LYRIC:
-            music_index = []
-            task_id = []
-            for item in music_items:
-                index = self.musicListWidget.indexFromItem(item).row()
-                self.taskList.addItem(item.text())
-                task_id.append(f"{item.text()}")
-                music_index.append(index)
-
-            if self.downloader.source == "酷狗音乐":
-                for o, n in enumerate(music_index):
-                    self.downloader.download_lyric(task_id[o], n)
-            else:
-                for o, n in enumerate(music_index):
-                    self.downloader.download_music(n, task_id[o], Mode.LYRIC)
-        
-        elif mode == Mode.IMPORT:
-            music_items = self.musicImportListWidget.selectedItems()
-            if not music_items:
-                QMessageBox.warning(self, "提示", "您未选择任何音乐")
-                return
+        if path != "":
+            self.configs["lyric_path"] = path
+            self.settingWindow.lyricPathEdit.setText(path)
             
-            music_index = []
-            task_id = []
-            for item in music_items:
-                index = self.musicImportListWidget.row(item)
-                self.taskList.addItem(item.text())
-                task_id.append(item.text())
-                music_index.append(index)
-
-            for o, n in enumerate(music_index):
-                self.downloader.download_music(n, task_id[o])
+    def setThreadNum(self, num):
+        try:
+            num = int(num)
+        except ValueError:
+            pass
+        else:
+            self.configs["thread_num"] = num
+        finally:
+            self.settingWindow.threadNumEdit.setText(str(self.configs["thread_num"]))
             
-    def importSongList(self):
-        info = self.searchLineEdit.text()
-        if  info == "":
-            QMessageBox.information(self, "无信息", "请输入查找信息！")
+    def setUa(self, ua):
+        if ua == "":
+            self.settingWindow.randomUaBtn.setChecked(True)
+            self.configs["ua"] = "random"
+        else:
+            self.configs["ua"] = ua
+        
+    def setUaState(self, state):
+        if state:
+            self.configs["ua"] == "random"
+            self.settingWindow.selfUaEdit.clear()
+            self.settingWindow.selfUaEdit.setEnabled(False)
+        else:
+            self.settingWindow.selfUaEdit.setEnabled(True)
+            
+    def setDownloadTip(self, state):
+        if state:
+            self.configs["downloadTip"] = True
+        else:
+            self.configs["downloadTip"] = False
+            
+    def setCheckNetworkState(self, state):
+        if state:
+            self.configs["checkNetwork"] = True
+        else:
+            self.configs["checkNetwork"] = False
+        
+    def setOpacity(self, level):
+        self.configs["v"] = level / 10
+        self.setWindowOpacity(self.configs["v"])
+        
+    def search(self, name):
+        if self.source == "":
+            Dialog("提示", "未选择音源", self).show()
+            return
+        elif name == "":
+            Dialog("提示", "未输入内容", self).show()
             return
         
-        self.downloader.source = "QQ音乐"
-        self.downloader.import_music(info)
+        self.searchTip = StateToolTip("搜索音乐", "正在搜索音乐，请稍后......", self)
+        self.searchTip.move(750, 500)
+        self.searchTip.show()
+        
+        self.searcher = Downloader(self.configs)
+        self.searcher.music_name = name
+        self.searcher.source = self.source
+        self.search_thread = QThread()
+        self.searcher.moveToThread(self.search_thread)
+        self.search_thread.started.connect(self.searcher.search_music)
+        self.searcher.task_done.connect(self.search_finished)
+        self.tasks.update(
+            {self.searcher: self.search_thread}
+        )
+        self.search_thread.start()
+        
+    def search_finished(self, res):
+        choice_list, self.searcher.songids = res
+        self.search_thread.quit()
+        self.search_thread.wait()
+        self.tasks.pop(self.searcher)
+        
+        self.searchWindow.musicTable.setColumnCount(2) 
+        self.searchWindow.musicTable.setColumnWidth(0, 465)
+        self.searchWindow.musicTable.setColumnWidth(1, 465)
+        self.searchWindow.musicTable.setHorizontalHeaderLabels(["歌名", "作者"])
+        self.searchWindow.musicTable.clearContents()
+        self.searchWindow.musicTable.setRowCount(len(choice_list))
+        for i, song_info in enumerate(choice_list):
+            for j in range(2):
+                self.searchWindow.musicTable.setItem(i, j, QTableWidgetItem(song_info[j]))
+                
+        self.searchWindow.musicTable.setToolTip("右键项目以操作")
+        self.searchTip.setState(True)
+        self.searchTip.setContent("搜索完成！")
+    
+    def download_music(self, state, n, content):
+        downloader = Downloader(self.configs)
+        downloader.n = n
+        if state == "search":
+            downloader.source = self.source
+            downloader.songids = self.searcher.songids
+            downloader.music_name = self.searcher.music_name
+        elif state == "import":
+            downloader.source = self.import_source
+            downloader.songids = self.importer.songids
+        downloader.task_id = QListWidgetItem(content)
+        
+        downloadMusicThread = QThread()
+        downloader.moveToThread(downloadMusicThread)
+        downloadMusicThread.started.connect(downloader.download_music)
+        downloader.task_done.connect(self.download_music_finished)
+        self.tasks.update(
+            {downloader: downloadMusicThread}
+        )
+        self.taskWindow.add_task(downloader.task_id)
+        downloadMusicThread.start()
+        
+    def download_music_finished(self, res):
+        info, downloader = res
+        if not info[0]:
+            Dialog("下载失败", f"'{downloader.task_id.text()}'下载失败：\n{info[1]}").show()
+        else:
+            if self.configs["downloadTip"]:
+                Dialog("下载成功", f"'{downloader.task_id.text()}'下载成功").show()
+                
+        self.taskWindow.remove_task(downloader.task_id)
+        self.tasks[downloader].quit()
+        self.tasks[downloader].wait()
+        self.tasks.pop(downloader)
+        
+    def download_lyric(self, state, n, content):
+        downloader = Downloader(self.configs)
+        downloader.n = n
+        if state == "search":
+            downloader.source = self.source
+            downloader.songids = self.searcher.songids
+            downloader.music_name = self.searcher.music_name
+        elif state == "import":
+            downloader.source = self.import_source
+            downloader.songids = self.importer.songids
+        downloader.task_id = QListWidgetItem(content)
+        
+        downloadMusicThread = QThread()
+        downloader.moveToThread(downloadMusicThread)
+        downloadMusicThread.started.connect(downloader.download_lyric)
+        downloader.task_done.connect(self.download_lyric_finished)
+        self.tasks.update(
+            {downloader: downloadMusicThread}
+        )
+        self.taskWindow.add_task(downloader.task_id)
+        downloadMusicThread.start()
+        
+    def download_lyric_finished(self, res):
+        info, downloader = res
+        if not info[0]:
+            Dialog("下载失败", f"'{downloader.task_id.text()}'下载失败：\n{info[1]}").show()
+        else:
+            if self.configs["downloadTip"]:
+                Dialog("下载成功", f"'{downloader.task_id.text()}'下载成功").show()
+                
+        self.taskWindow.remove_task(downloader.task_id)
+        self.tasks[downloader].quit()
+        self.tasks[downloader].wait()
+        self.tasks.pop(downloader)
+        
+    def import_music(self, info):
+        if self.import_source == "":
+            Dialog("提示", "未选择音源", self).show()
+            return
+        elif info == "":
+            Dialog("提示", "未输入内容", self).show()
+            return
+        
+        self.importTip = StateToolTip("导入歌单", "正在导入歌单，请稍后......", self)
+        self.importTip.move(750, 500)
+        self.importTip.show()
 
-
-    def update(self):
-        self.updateCheckBtn.setEnabled(False)
-        version, info = update(self.downloader.ua)
+        self.importer = Downloader(self.configs)
+        self.importer.info = info
+        self.importer.source = self.import_source
+        self.import_thread = QThread()
+        self.importer.moveToThread(self.import_thread)
+        self.import_thread.started.connect(self.importer.import_music)
+        self.importer.task_done.connect(self.import_finished)
+        self.tasks.update(
+            {self.importer: self.import_thread}
+        )
+        self.import_thread.start()
+        
+    def import_finished(self, res):
+        if res:
+            self.import_thread.quit()
+            self.import_thread.wait()
+            self.tasks.pop(self.importer)
+            
+            data, tags, choice_list, self.importer.songids = res
+            
+            self.importWindow.nameLabel.setText(data["dissname"])
+            self.importWindow.createrLabel.setText(data["nickname"])
+            self.importWindow.contentLabel.setText(data["desc"])
+            self.importWindow.numLabel.setText(str(data["total_song_num"]))
+            self.importWindow.peopleLabel.setText(str((data["visitnum"])))
+            self.importWindow.tagLabel.setText(tags)
+            
+            self.importWindow.musicTable.setColumnCount(3)
+            self.importWindow.musicTable.setColumnWidth(0, 307)
+            self.importWindow.musicTable.setColumnWidth(1, 307)
+            self.importWindow.musicTable.setColumnWidth(2, 307)
+            self.importWindow.musicTable.setHorizontalHeaderLabels(["歌名", "作者", "发布时间"])
+            self.importWindow.musicTable.clearContents()
+            self.importWindow.musicTable.setRowCount(len(choice_list))
+            for i, song_info in enumerate(choice_list):
+                for j in range(3):
+                    self.importWindow.musicTable.setItem(i, j, QTableWidgetItem(song_info[j]))
+            
+            self.searchWindow.musicTable.setToolTip("右键项目以操作")
+            self.importTip.setState(True)
+            self.importTip.setContent("导入完成！")
+        else:
+            self.importTip.setState(True)
+            self.importTip.setContent("导入失败！")
+        
+    def check_update(self):
+        self.aboutWindow.updateBtn.setEnabled(False)
+        self.checkUpdateTip = StateToolTip("检查更新", "正在检查更新，请稍后......", self)
+        self.checkUpdateTip.move(750, 500)
+        self.checkUpdateTip.show()
+        self.updater = Downloader(self.configs)
+        self.checkUpdateThread = QThread()
+        self.updater.moveToThread(self.checkUpdateThread)
+        self.checkUpdateThread.started.connect(self.updater.checkUpdate)
+        self.updater.task_done.connect(self.check_update_finished)
+        self.tasks.update(
+            {self.updater: self.checkUpdateThread}
+        )
+        self.checkUpdateThread.start()
+    
+    def check_update_finished(self, res):
+        self.tasks.pop(self.updater)
+        self.checkUpdateThread.quit()
+        self.checkUpdateThread.wait()
+        version, info = res
+        self.aboutWindow.updateText.setMarkdown(info)
 
         if version == __version__:
-            QMessageBox.information(self, "检查更新", f"当前已是最新版本\n{__version__}")
-            return
-        
-        self.latest_version = version
-        QMessageBox.information(self, "检查更新", f"有可用的更新\n{version}")
-        self.latestInfo.setMarkdown(info)
-        self.mainStacked.setCurrentIndex(3)
-        self.updateCheckBtn.setEnabled(True)
-
-    def updating(self):
-        self.updateLabel.setText("请稍后......")
-        self.updateCheckBtn.setEnabled(False)
-        self.updateBtn.setEnabled(False)
-        self.downloader.update(self.latest_version)
-
-    def bind(self):
-        # 搜索按钮绑定
-        self.searchBtn.clicked.connect(self.searchMusic)
-        self.searchLineEdit.returnPressed.connect(self.searchMusic)
-        # 导入歌单菜单按钮绑定
-        self.imp_menu.triggered.connect(self.importSongList)
-        # 音源按钮组绑定
-        self.source_group.buttonClicked.connect(self.setSource)
-        # 菜单按钮绑定
-        self.taskBtn.clicked.connect(lambda: self.menuStacked.setCurrentIndex(0))
-        self.styleBtn.clicked.connect(lambda: self.menuStacked.setCurrentIndex(1))
-        self.fileBtn.clicked.connect(lambda: self.menuStacked.setCurrentIndex(2))
-        self.downloadBtn.clicked.connect(lambda: self.menuStacked.setCurrentIndex(3))
-        self.aboutBtn.clicked.connect(lambda: self.menuStacked.setCurrentIndex(4))
-        # 更新按钮绑定
-        self.updateCheckBtn.clicked.connect(self.update)
-        self.updateBtn.clicked.connect(self.updating)
-        # 主题下拉框绑定
-        self.comboBox.currentIndexChanged.connect(lambda: self.change_theme(app, self.comboBox.currentText()))
-        # 选择背景按钮绑定
-        self.bgBtn.clicked.connect(self.change_bg)
-        # 窗口透明度滑条绑定
-        self.visSlider.valueChanged.connect(self.vis)
-        # 恢复默认样式按钮绑定
-        self.resetBtn.clicked.connect(self.resetStyle)
-        # 打开音乐保存目录按钮绑定
-        self.musicOpenBtn.clicked.connect(lambda: os.startfile(self.downloader.music_path))
-        # 打开歌词保存目录按钮绑定
-        self.lyricOpenBtn.clicked.connect(lambda: os.startfile(self.downloader.lyric_path))
-        # 音乐和歌词保存目录选择按钮绑定
-        self.musicPathBtn.clicked.connect(self.setMusicPath)
-        self.lyricPathBtn.clicked.connect(self.setLyricPath)
-        # 线程数设置按钮绑定
-        self.threadBtn.clicked.connect(self.setThreadNum)
-        # 随机UACheckBox绑定
-        self.randomUaCheck.stateChanged.connect(self.setUa)
-        # 下载按钮绑定
-        self.importMusicDownBtn.clicked.connect(lambda: self.download(Mode.IMPORT))
-        self.musicDownBtn.clicked.connect(lambda: self.download(Mode.MUSIC))
-        self.lyricDownBtn.clicked.connect(lambda: self.download(Mode.LYRIC))
-        # 音乐列表清空按钮绑定
-        self.importMusicClearBtn.clicked.connect(self.musicImportListWidget.clear)
-        self.musicResClearBtn.clicked.connect(self.musicListWidget.clear)
-        # 音质按钮组绑定
-        self.quality_group.buttonClicked.connect(self.setQuality)
-        # 其他控件绑定
-        self.sponserBtn.clicked.connect(self.sponsorshipWindowShow)
-
-    def closeEvent(self, event):
-        
-        if self.taskList.count():
-            res = QMessageBox.question(self, "退出", "当前还有任务正在进行，确定要退出吗？", QMessageBox.Yes | QMessageBox.No)
+            self.checkUpdateTip.setState(True)
+            self.checkUpdateTip.setContent(f"当前已经是最新版本：{version}")
         else:
-            res = QMessageBox.question(self, "退出", "确定要退出吗？", QMessageBox.Yes | QMessageBox.No)
+            self.checkUpdateTip.setState(True)
+            self.checkUpdateTip.setContent(f"有可用的更新：{version}")
+            res = Dialog("更新", "有新版本可用，是否下载文件？", self)
+            if res.exec():
+                self.updateTip = StateToolTip("更新", "正在下载中，请稍后......", self)
+                self.updateTip.move(750, 500)
+                self.updateTip.show()
+                
+                # 创建更新线程
+                self.update_thread = QThread()
+                self.updater.moveToThread(self.update_thread)
+                self.update_thread.started.connect(self.updater.update)
+                self.updater.task_done.connect(self.update_finished)
+                self.tasks.update(
+                    {self.updater: self.update_thread}
+                )
+                self.update_thread.start()
+        
+        self.aboutWindow.updateBtn.setEnabled(True)
+            
+    def update_finished(self, res):
+        self.tasks.pop(self.updater)
+        self.update_thread.quit()
+        self.update_thread.wait()
+        self.updateTip.close()
+        if res[0]:
+            Dialog("下载更新", f"下载完成，文件在{res[1]}", self)
+        else:
+            Dialog("下载更新", "下载失败！", self)
+    
+    def closeEvent(self, event):
+        if self.tasks:
+            res = Dialog("退出", "当前还有任务正在进行，确定要退出吗？", self)
+        else:
+            res = Dialog("退出", "确定要退出吗？", self)
 
-        if res == QMessageBox.Yes:
-            with open("config.json", "w", encoding="utf-8") as f:
-                config = {
-                    "theme": self.theme,
-                    "v": self.v,
-                    "music_path": self.downloader.music_path,
-                    "lyric_path": self.downloader.lyric_path,
-                    "img_file": self.img_file,
-                    "thread_num": self.downloader.thread_num,
-                    "ua": self.downloader.ua
-                }
-                dump(config, f)
+        if res.exec():
+            with open("source/config.json", "w") as f:
+                dump(self.configs, f)
             event.accept()
         else:
             event.ignore()
-
+    
 
 if __name__ == "__main__":
     app = QApplication()
-    
-    w = MainWindow()
-    w.show()
-
+    window = Window()
+    window.show()
     sys.exit(app.exec())
