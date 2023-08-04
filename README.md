@@ -1,5 +1,7 @@
 # BlackStone_Music_GUI
 
+## 接口跑路，该项目暂时停止维护
+
 >:page_facing_up: 正如简介所述，这是一个简约的音乐下载工具
 
 ![sample](sample.jpg)
